@@ -1,7 +1,7 @@
 // app/(tabs)/flights/index.tsx (CHỈ CÒN FORM VÀ ROUTER PUSH)
 
 import React, { useState } from 'react';
-import { StyleSheet, View, Text, TouchableOpacity, Switch, Alert, ScrollView, Platform } from 'react-native';
+import { StyleSheet, View, Text, TouchableOpacity, Switch, Alert, ScrollView, Platform, Modal } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { Stack, router } from 'expo-router';
 import { format } from 'date-fns';
@@ -50,14 +50,13 @@ const FlightSearchScreen = () => {
 
         // Dùng Router để chuyển hướng đến màn hình results.tsx
         router.push({
-            pathname: '/results/flight',
+            pathname: '/flights/results', // Use new results screen
             params: {
                 from: fromCode,
                 to: toCode,
                 departDate: departDate.toISOString(),
                 isRoundTrip: isRoundTrip.toString(),
                 returnDate: returnDate ? returnDate.toISOString() : undefined,
-                // Thêm tên thành phố đầy đủ để hiển thị trong header của results.tsx
                 fromName: from.replace(/\s*\([^)]*\)/, ''),
                 toName: to.replace(/\s*\([^)]*\)/, ''),
             },
@@ -65,8 +64,11 @@ const FlightSearchScreen = () => {
     };
 
     // --- Handlers Date Picker ---
+    // --- Handlers Date Picker ---
     const onDepartChange = (event: any, selectedDate?: Date) => {
-        setShowDepartPicker(false);
+        if (Platform.OS === 'android') {
+            setShowDepartPicker(false);
+        }
         if (selectedDate) {
             setDepartDate(selectedDate);
             if (returnDate && selectedDate > returnDate) {
@@ -76,7 +78,9 @@ const FlightSearchScreen = () => {
     };
 
     const onReturnChange = (event: any, selectedDate?: Date) => {
-        setShowReturnPicker(false);
+        if (Platform.OS === 'android') {
+            setShowReturnPicker(false);
+        }
         if (selectedDate) {
             setReturnDate(selectedDate);
         }
@@ -134,8 +138,67 @@ const FlightSearchScreen = () => {
                 )}
 
                 {/* DateTimePickers (Đã chuyển sang display="default") */}
-                {showDepartPicker && (<DateTimePicker value={departDate} mode="date" display="default" onChange={onDepartChange} minimumDate={new Date()} />)}
-                {showReturnPicker && (<DateTimePicker value={returnDate || new Date(departDate)} mode="date" display="default" onChange={onReturnChange} minimumDate={departDate} />)}
+                {/* DateTimePickers */}
+                {/* Android Implementation */}
+                {Platform.OS === 'android' && showDepartPicker && (
+                    <DateTimePicker value={departDate} mode="date" display="default" onChange={onDepartChange} minimumDate={new Date()} />
+                )}
+                {Platform.OS === 'android' && showReturnPicker && (
+                    <DateTimePicker value={returnDate || new Date(departDate)} mode="date" display="default" onChange={onReturnChange} minimumDate={departDate} />
+                )}
+
+                {/* iOS Implementation (Modal with Inline Calendar) */}
+                {Platform.OS === 'ios' && (
+                    <>
+                        <Modal visible={showDepartPicker} transparent={true} animationType="fade">
+                            <View style={styles.modalOverlay}>
+                                <View style={styles.modalContent}>
+                                    <View style={styles.modalHeader}>
+                                        <Text style={styles.modalTitle}>Chọn ngày đi</Text>
+                                        <TouchableOpacity onPress={() => setShowDepartPicker(false)} style={styles.doneButton}>
+                                            <Text style={styles.doneButtonText}>Xong</Text>
+                                        </TouchableOpacity>
+                                    </View>
+                                    <DateTimePicker
+                                        value={departDate}
+                                        mode="date"
+                                        display="inline"
+                                        onChange={onDepartChange}
+                                        minimumDate={new Date()}
+                                        style={styles.datePicker}
+                                        themeVariant="light"
+                                        textColor="black"
+                                        accentColor={Colors.primary}
+                                    />
+                                </View>
+                            </View>
+                        </Modal>
+
+                        <Modal visible={showReturnPicker} transparent={true} animationType="fade">
+                            <View style={styles.modalOverlay}>
+                                <View style={styles.modalContent}>
+                                    <View style={styles.modalHeader}>
+                                        <Text style={styles.modalTitle}>Chọn ngày về</Text>
+                                        <TouchableOpacity onPress={() => setShowReturnPicker(false)} style={styles.doneButton}>
+                                            <Text style={styles.doneButtonText}>Xong</Text>
+                                        </TouchableOpacity>
+                                    </View>
+                                    <DateTimePicker
+                                        value={returnDate || new Date(departDate)}
+                                        mode="date"
+                                        display="inline"
+                                        onChange={onReturnChange}
+                                        minimumDate={departDate}
+                                        style={styles.datePicker}
+                                        themeVariant="light"
+                                        textColor="black"
+                                        accentColor={Colors.primary}
+                                    />
+                                </View>
+                            </View>
+                        </Modal>
+                    </>
+                )}
 
             </View>
 
@@ -161,4 +224,12 @@ const styles = StyleSheet.create({
     inputText: { fontSize: 15, color: Colors.text, flex: 1 },
     searchButton: { backgroundColor: Colors.primary, paddingVertical: 14, borderRadius: 14, alignItems: 'center', marginTop: 10 },
     searchButtonText: { color: Colors.white, fontSize: 16, fontWeight: 'bold' },
+    // Modal Styles
+    modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'center', alignItems: 'center', padding: 20 },
+    modalContent: { backgroundColor: 'white', borderRadius: 20, paddingBottom: 20, width: '100%', maxWidth: 350, overflow: 'hidden' },
+    modalHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: 15, borderBottomWidth: 1, borderBottomColor: '#eee', backgroundColor: '#f9f9f9' },
+    modalTitle: { fontSize: 16, fontWeight: 'bold', color: Colors.text },
+    doneButton: { paddingHorizontal: 10, paddingVertical: 5 },
+    doneButtonText: { color: Colors.primary, fontSize: 16, fontWeight: 'bold' },
+    datePicker: { height: 350, width: '100%' },
 });

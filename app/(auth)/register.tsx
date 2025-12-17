@@ -60,7 +60,7 @@ export default function RegisterScreen() {
       });
 
       Alert.alert("Thành công", "Đăng ký tài khoản và lưu thông tin thành công!");
-      router.replace("/auth/login");
+      router.replace("/login");
     } catch (err: any) {
       let msg = err.message;
       if (err.code === "auth/email-already-in-use") msg = "Email này đã được sử dụng.";
@@ -84,7 +84,7 @@ export default function RegisterScreen() {
           <View style={authStyles.card}>
             {/* Tab */}
             <View style={authStyles.tabRow}>
-              <Pressable style={authStyles.tab} onPress={() => router.replace("/auth/login")}>
+              <Pressable style={authStyles.tab} onPress={() => router.replace("/login")}>
                 <Text style={authStyles.tabText}>Đăng nhập</Text>
               </Pressable>
               <Pressable style={[authStyles.tab, authStyles.tabActive]}>
@@ -171,7 +171,7 @@ export default function RegisterScreen() {
 
             <View style={authStyles.bottomRow}>
               <Text style={{ color: "#666" }}>Đã có tài khoản?</Text>
-              <Pressable onPress={() => router.replace("/auth/login")}>
+              <Pressable onPress={() => router.replace("/login")}>
                 <Text style={authStyles.bottomLink}> Đăng nhập</Text>
               </Pressable>
             </View>

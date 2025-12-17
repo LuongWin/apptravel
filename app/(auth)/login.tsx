@@ -57,7 +57,7 @@ export default function LoginScreen() {
               <Pressable style={[authStyles.tab, authStyles.tabActive]}>
                 <Text style={[authStyles.tabText, authStyles.tabTextActive]}>Đăng nhập</Text>
               </Pressable>
-              <Pressable style={authStyles.tab} onPress={() => router.replace("/auth/register")}>
+              <Pressable style={authStyles.tab} onPress={() => router.replace("/register")}>
                 <Text style={authStyles.tabText}>Đăng ký</Text>
               </Pressable>
             </View>
@@ -115,7 +115,7 @@ export default function LoginScreen() {
 
             <View style={authStyles.bottomRow}>
               <Text style={{ color: "#666" }}>Chưa có tài khoản?</Text>
-              <Pressable onPress={() => router.replace("/auth/register")}>
+              <Pressable onPress={() => router.replace("/register")}>
                 <Text style={authStyles.bottomLink}> Đăng ký ngay</Text>
               </Pressable>
             </View>

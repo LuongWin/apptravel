@@ -1,11 +1,11 @@
 {
   "expo": {
-    "name": "Mobileapp",
-    "slug": "Mobileapp",
+    "name": "TravelGoNew",
+    "slug": "TravelGoNew",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
-    "scheme": "mobileapp",
+    "scheme": "travelgonew",
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
     "ios": {

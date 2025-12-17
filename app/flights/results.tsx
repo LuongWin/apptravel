@@ -1,203 +1,104 @@
-import React, { useEffect, useState, useCallback } from 'react';
-import { StyleSheet, View, Text, ActivityIndicator, FlatList, Alert } from 'react-native';
-import { useLocalSearchParams, Stack, router } from 'expo-router';
-import { Ionicons } from '@expo/vector-icons';
-import { useFlights, Flight } from '@/hooks/useFlights';
-import { format } from 'date-fns';
-import { vi } from 'date-fns/locale';
+import React from "react";
+import { View, Text, FlatList, TouchableOpacity, Image, StyleSheet } from "react-native";
+import { useLocalSearchParams, useRouter, Stack } from "expo-router";
+import { SafeAreaView } from "react-native-safe-area-context";
+import { Ionicons } from "@expo/vector-icons";
 
-// Import FlightCard (Assuming it exists and exports default)
-import FlightCard from '@/components/FlightCard';
+// Mock Data chuyến bay
+const MOCK_FLIGHTS = [
+  { id: "VN123", airline: "Vietnam Airlines", code: "VN-123", departTime: "08:00", arriveTime: "10:10", duration: "2h 10m", price: 1500000, logo: "https://upload.wikimedia.org/wikipedia/commons/thumb/6/6b/Vietnam_Airlines_Logo.svg/1200px-Vietnam_Airlines_Logo.svg.png" },
+  { id: "VJ456", airline: "Vietjet Air", code: "VJ-456", departTime: "14:30", arriveTime: "16:40", duration: "2h 10m", price: 950000, logo: "https://upload.wikimedia.org/wikipedia/en/thumb/8/8e/VietJet_Air_logo.svg/1200px-VietJet_Air_logo.svg.png" },
+  { id: "QH789", airline: "Bamboo Airways", code: "QH-789", departTime: "19:00", arriveTime: "21:10", duration: "2h 10m", price: 1200000, logo: "https://upload.wikimedia.org/wikipedia/commons/thumb/5/5b/Bamboo_Airways_logo.svg/2560px-Bamboo_Airways_logo.svg.png" },
+];
 
-// --- Constants ---
-const Colors = {
-    primary: '#5B37B7', text: '#333', textSecondary: '#666', background: '#F9F9F9',
-    white: '#FFFFFF', border: '#E0E0E0', price: '#4F46E5',
-    success: '#4CAF50',
-};
+export default function FlightResultsScreen() {
+  const params = useLocalSearchParams();
+  const router = useRouter();
 
-// --- Helper: Get City Name ---
-const getCityName = (code: string) => {
-    const lookup: { [key: string]: string } = {
-        'HAN': 'Hà Nội', 'SGN': 'TP. HCM', 'DAD': 'Đà Nẵng', 'CXR': 'Nha Trang', 'PQC': 'Phú Quốc'
-    };
-    return lookup[code] || code;
-};
+  return (
+    <SafeAreaView style={styles.container}>
+      <Stack.Screen options={{ headerShown: false }} />
 
-// --- Screen: Flight Results ---
-const FlightResultsScreen = () => {
-    // 1. Receive params
-    const params = useLocalSearchParams<{
-        from: string; to: string; departDate: string; isRoundTrip: string; returnDate?: string;
-        fromName?: string; toName?: string;
-    }>();
-
-    const { flights, loading, error, searchFlights } = useFlights();
-
-    // 2. State for Round Trip
-    const [isSearchingReturn, setIsSearchingReturn] = useState(false);
-    const [selectedOutboundFlight, setSelectedOutboundFlight] = useState<Flight | null>(null);
-
-    const isRoundTripBool = params.isRoundTrip === 'true';
-
-    // 3. Determine Search Criteria based on "Phase" (Outbound vs Return)
-    const departureCode = isSearchingReturn ? params.to : params.from;
-    const arrivalCode = isSearchingReturn ? params.from : params.to;
-
-    const searchDateStr = isSearchingReturn ? params.returnDate : params.departDate;
-    const searchDate = searchDateStr ? new Date(searchDateStr) : null;
-
-    const currentRouteText = `${getCityName(departureCode as string)} → ${getCityName(arrivalCode as string)}`;
-    const currentSearchDateString = searchDate ? format(searchDate, 'dd/MM/yyyy', { locale: vi }) : 'N/A';
-
-    // 4. Fetch Data Logic
-    const fetchData = useCallback(async () => {
-        if (!searchDate || isNaN(searchDate.getTime())) return;
-
-        console.log(`Searching flights: ${departureCode} -> ${arrivalCode} on ${searchDate}`);
-
-        await searchFlights({
-            from: departureCode as string,
-            to: arrivalCode as string,
-            date: searchDate,
-        }, false); // Pass false because we already swapped cities manually above (departureCode/arrivalCode)
-    }, [departureCode, arrivalCode, searchDate, searchFlights, isSearchingReturn]);
-
-    // Initial Fetch & Refetch on Phase Change
-    useEffect(() => {
-        fetchData();
-    }, [fetchData]);
-
-    // 5. Handle Flight Selection
-    const handleBookPress = (flight: Flight) => {
-        if (isRoundTripBool && !isSearchingReturn) {
-            // Case 1: Round Trip - Selected Outbound
-            if (!params.returnDate) {
-                Alert.alert("Lỗi", "Vui lòng chọn ngày về cho chuyến bay khứ hồi.");
-                return;
-            }
-
-            Alert.alert(
-                "Đã chọn chuyến đi",
-                `Bạn đã chọn chuyến ${flight.flightNumber}. Bây giờ hãy chọn chuyến về.`,
-                [
-                    {
-                        text: "OK",
-                        onPress: () => {
-                            setSelectedOutboundFlight(flight);
-                            setIsSearchingReturn(true); // Switches "Phase" -> triggers re-render -> new search
-                        }
-                    }
-                ]
-            );
-
-        } else {
-            // Case 2: One Way OR Round Trip (Selected Return)
-            const bookingDetails = {
-                outboundFlight: isSearchingReturn ? selectedOutboundFlight : flight,
-                returnFlight: isSearchingReturn ? flight : null
-            };
-
-            // Navigate to Detail Screen
-            router.push({
-                pathname: '/flights/detail',
-                params: {
-                    booking: JSON.stringify(bookingDetails)
-                },
-            });
-        }
-    };
-
-    // --- Render Helpers ---
-
-    if (loading) {
-        return (
-            <View style={styles.centered}>
-                <ActivityIndicator size="large" color={Colors.primary} />
-                <Text style={{ marginTop: 10, color: Colors.textSecondary }}>
-                    {isSearchingReturn ? "Đang tìm chuyến về..." : "Đang tìm chuyến đi..."}
-                </Text>
-            </View>
-        );
-    }
-
-    return (
-        <View style={styles.container}>
-            <Stack.Screen
-                options={{
-                    title: isSearchingReturn ? "Chọn Chiều Về" : "Chọn Chiều Đi",
-                    headerTintColor: Colors.text,
-                    headerShadowVisible: false,
-                    headerStyle: { backgroundColor: Colors.background },
-                    headerBackTitle: "Tìm lại"
-                }}
-            />
-
-            {/* Info Sub-header */}
-            <View style={styles.subHeader}>
-                <View style={styles.routeContainer}>
-                    <Ionicons name={isSearchingReturn ? "airplane-outline" : "airplane"} size={20} color={Colors.primary} style={{ transform: [{ scaleX: isSearchingReturn ? -1 : 1 }] }} />
-                    <Text style={styles.subHeaderText}>
-                        {currentRouteText}
-                    </Text>
-                </View>
-                <Text style={styles.dateText}>{currentSearchDateString}</Text>
-            </View>
-
-            {/* Selected Outbound Summary (Only when picking return) */}
-            {isSearchingReturn && selectedOutboundFlight && (
-                <View style={styles.summaryBar}>
-                    <View style={styles.summaryRow}>
-                        <Ionicons name="checkmark-circle" size={18} color={Colors.success} />
-                        <Text style={styles.summaryLabel}>Chiều đi đã chọn:</Text>
-                    </View>
-                    <Text style={styles.summaryText}>
-                        {selectedOutboundFlight.flightNumber} ({format(new Date(selectedOutboundFlight.departAt), 'HH:mm')})
-                    </Text>
-                </View>
-            )}
-
-            {error && (
-                <View style={styles.centered}>
-                    <Text style={styles.errorText}>Không tìm thấy chuyến bay nào.</Text>
-                    <Text style={styles.errorSubText}>Vui lòng thử lại với ngày khác.</Text>
-                </View>
-            )}
-
-            <FlatList
-                data={flights}
-                keyExtractor={(item) => item.id}
-                renderItem={({ item }) => <FlightCard flight={item} onBookPress={handleBookPress} />}
-                contentContainerStyle={{ padding: 16, paddingBottom: 40 }}
-                ListEmptyComponent={() => (
-                    !loading && !error ? (
-                        <View style={styles.centered}>
-                            <Ionicons name="airplane-outline" size={50} color="#CCC" />
-                            <Text style={styles.emptyText}>Không có chuyến bay nào.</Text>
-                        </View>
-                    ) : null
-                )}
-            />
+      {/* Header */}
+      <View style={styles.header}>
+        <TouchableOpacity onPress={() => router.back()}>
+          <Ionicons name="arrow-back" size={24} color="#333" />
+        </TouchableOpacity>
+        <View style={{ marginLeft: 15 }}>
+          <Text style={styles.routeTitle}>
+            {params.origin} ➝ {params.destination}
+          </Text>
+          <Text style={styles.dateSub}>
+            {params.date} • {params.passengers} khách
+          </Text>
         </View>
-    );
-};
+      </View>
 
-export default FlightResultsScreen;
+      <FlatList
+        data={MOCK_FLIGHTS}
+        keyExtractor={(item) => item.id}
+        contentContainerStyle={{ padding: 15 }}
+        renderItem={({ item }) => (
+          <TouchableOpacity
+            style={styles.card}
+            onPress={() =>
+              router.push({
+                pathname: "./flights/booking-confirm",
+                params: {
+                  flightData: JSON.stringify(item),
+                  ...params, // Truyền tiếp thông tin ngày/khách
+                },
+              })
+            }
+          >
+            <View style={styles.cardHeader}>
+              <View style={{ flexDirection: "row", alignItems: "center" }}>
+                <Image source={{ uri: item.logo }} style={styles.logo} resizeMode="contain" />
+                <Text style={styles.airlineName}>{item.airline}</Text>
+              </View>
+              <Text style={styles.price}>{item.price.toLocaleString()} ₫</Text>
+            </View>
+
+            <View style={styles.flightInfo}>
+              <View>
+                <Text style={styles.time}>{item.departTime}</Text>
+                <Text style={styles.airportCode}>HAN</Text>
+              </View>
+
+              <View style={{ alignItems: "center" }}>
+                <Text style={styles.duration}>{item.duration}</Text>
+                <View style={styles.line} />
+                <Text style={styles.type}>Bay thẳng</Text>
+              </View>
+
+              <View style={{ alignItems: "flex-end" }}>
+                <Text style={styles.time}>{item.arriveTime}</Text>
+                <Text style={styles.airportCode}>SGN</Text>
+              </View>
+            </View>
+          </TouchableOpacity>
+        )}
+      />
+    </SafeAreaView>
+  );
+}
 
 const styles = StyleSheet.create({
-    container: { flex: 1, backgroundColor: Colors.background },
-    centered: { flex: 1, justifyContent: 'center', alignItems: 'center', marginTop: 50, padding: 20 },
-    subHeader: { paddingHorizontal: 20, paddingBottom: 15, backgroundColor: Colors.background, borderBottomWidth: 1, borderBottomColor: '#eee' },
-    routeContainer: { flexDirection: 'row', alignItems: 'center', marginBottom: 4 },
-    subHeaderText: { fontSize: 18, fontWeight: 'bold', color: Colors.text, marginLeft: 8 },
-    dateText: { fontSize: 14, color: Colors.textSecondary, marginLeft: 28 },
+  container: { flex: 1, backgroundColor: "#F5F5F5" },
+  header: { flexDirection: "row", alignItems: "center", padding: 15, backgroundColor: "#FFF", borderBottomWidth: 1, borderBottomColor: "#EEE" },
+  routeTitle: { fontSize: 16, fontWeight: "bold" },
+  dateSub: { fontSize: 12, color: "#666" },
 
-    summaryBar: { padding: 12, backgroundColor: '#E8F5E9', borderBottomWidth: 1, borderBottomColor: '#C8E6C9', flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 20 },
-    summaryRow: { flexDirection: 'row', alignItems: 'center' },
-    summaryLabel: { marginLeft: 6, color: '#2E7D32', fontWeight: '600' },
-    summaryText: { color: '#2E7D32', fontWeight: 'bold' },
+  card: { backgroundColor: "#FFF", borderRadius: 12, padding: 15, marginBottom: 15, elevation: 2 },
+  cardHeader: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 15 },
+  logo: { width: 30, height: 30, marginRight: 10 },
+  airlineName: { fontWeight: "bold", color: "#555" },
+  price: { fontSize: 18, fontWeight: "bold", color: "#FF5722" },
 
-    errorText: { color: Colors.textSecondary, fontSize: 16, textAlign: 'center' },
-    errorSubText: { color: Colors.textSecondary, marginTop: 5, fontSize: 14 },
-    emptyText: { color: Colors.textSecondary, marginTop: 10, fontSize: 16 },
+  flightInfo: { flexDirection: "row", justifyContent: "space-between", alignItems: "center" },
+  time: { fontSize: 20, fontWeight: "bold", color: "#333" },
+  airportCode: { color: "#888", fontSize: 12 },
+  duration: { fontSize: 12, color: "#666", marginBottom: 5 },
+  line: { width: 60, height: 1, backgroundColor: "#DDD", marginBottom: 5 },
+  type: { fontSize: 10, color: "#1BA0E2" },
 });

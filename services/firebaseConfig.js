@@ -1,27 +1,25 @@
-// services/firebaseConfig.js
+// configs/firebaseConfig.ts (hoáº·c services/firebaseConfig.ts)
+import { initializeApp } from "firebase/app";
+// Quan trá»ng: Pháº£i import hÃ m nÃ y
+import { initializeAuth, getReactNativePersistence } from "firebase/auth";
+import { getFirestore } from "firebase/firestore";
+import ReactNativeAsyncStorage from "@react-native-async-storage/async-storage";
 
-import { initializeApp } from 'firebase/app';
-import { getAuth } from 'firebase/auth'; // N?u b?n dùng Authentication
-import { getFirestore } from 'firebase/firestore'; // N?u b?n dùng Firestore
-
-// 1. Dán c?u h?nh t? Firebase Console vào ğây
 const firebaseConfig = {
-  apiKey: "AIzaSyBSYqFoHi7_tcbbuJbJ-98Tv0HCYLXNxAo",
-  authDomain: "appdulich-e282e.firebaseapp.com",
-  databaseURL: "https://appdulich-e282e-default-rtdb.firebaseio.com",
-  projectId: "appdulich-e282e",
-  storageBucket: "appdulich-e282e.firebasestorage.app",
-  messagingSenderId: "451313908573",
-  appId: "1:451313908573:web:5ed3fd5fe19e963339c6b4",
-  measurementId: "G-04TXLM6VZ4"
+  apiKey: "AIzaSyBUio-cLulmB_gItV-mODGAUJmOmkh2RU8",
+  authDomain: "testtraveloka-e16ea.firebaseapp.com",
+  projectId: "testtraveloka-e16ea",
+  storageBucket: "testtraveloka-e16ea.firebasestorage.app",
+  messagingSenderId: "260462046702",
+  appId: "1:260462046702:web:f6f7dab1203d18ed9232ff",
+  measurementId: "G-G11Y84LBJE",
 };
 
-// 2. Kh?i t?o Firebase
 const app = initializeApp(firebaseConfig);
 
-// 3. Kh?i t?o các d?ch v? b?n c?n (ví d?: Auth và Firestore)
-export const auth = getAuth(app);
-export const db = getFirestore(app);
+// Sá»­a láº¡i Ä‘oáº¡n nÃ y Ä‘á»ƒ khá»›p vá»›i phiÃªn báº£n má»›i
+export const auth = initializeAuth(app, {
+  persistence: getReactNativePersistence(ReactNativeAsyncStorage),
+});
 
-// Xu?t các ğ?i tı?ng ğ? ğı?c kh?i t?o ğ? s? d?ng trong toàn b? ?ng d?ng
-// export default app;
+export const db = getFirestore(app);

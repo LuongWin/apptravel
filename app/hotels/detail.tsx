@@ -94,6 +94,7 @@ const HotelBookingDetailScreen = () => {
                 contactInfo: { firstName, lastName, email, phoneNumber: phone },
                 guestCount: bookingDetails.guestCount || 2,
                 roomQuantity: roomQuantity, // 4. Include room quantity
+                hotelImage: bookingDetails.hotelImage
             });
 
             // Show success modal instead of Alert

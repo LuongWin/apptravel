@@ -1,10 +1,11 @@
 import React, { useState, useCallback } from 'react';
-import { StyleSheet, View, Text, FlatList, TouchableOpacity, ActivityIndicator, Image } from 'react-native';
+import { StyleSheet, View, Text, FlatList, TouchableOpacity, ActivityIndicator, Image, StatusBar } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter, useFocusEffect } from 'expo-router';
 import { auth, db } from '@/services/firebaseConfig';
-import { collection, query, where, orderBy, getDocs, Timestamp } from 'firebase/firestore';
+import { collection, query, where, orderBy, getDocs, Timestamp, doc, getDoc } from 'firebase/firestore';
+import { format } from 'date-fns';
 
 const Colors = {
     primary: '#0194F3',
@@ -28,13 +29,23 @@ interface HistoryItem {
     totalPrice?: number;
     // Hotel specific
     hotelName?: string;
+    hotelId?: string;
     roomName?: string;
+    hotelImage?: string;
+    checkInDate?: string;
+    checkOutDate?: string;
     // Flight specific
+    // Flight specific
+    airlineLogo?: string; // NEW: persisted top-level
+    bookingImage?: string; // NEW: persisted top-level
     outboundFlightSnapshot?: {
         from: string;
         to: string;
         airline: string;
         departureTime: string;
+        date: string; // Assuming 'date' is stored like '2023-10-27' or similar
+        image?: string; // or logo
+        airlineLogo?: string;
     };
 }
 
@@ -79,17 +90,36 @@ export default function HistoryScreen() {
                 ...doc.data()
             } as HistoryItem));
 
-            setHistoryData(data);
+            if (activeTab === 'HOTEL') {
+                // Determine which items need a fallback image
+                const enhancedData = await Promise.all(data.map(async (item) => {
+                    // Check if hotelImage is missing/empty but hotelId exists
+                    if ((!item.hotelImage || item.hotelImage.length === 0) && item.hotelId) {
+                        try {
+                            const hotelRef = doc(db, 'HOTELS', item.hotelId);
+                            const hotelSnap = await getDoc(hotelRef);
+                            if (hotelSnap.exists()) {
+                                const hotelData = hotelSnap.data();
+                                // Assuming images is an array of strings
+                                if (hotelData.images && Array.isArray(hotelData.images) && hotelData.images.length > 0) {
+                                    return { ...item, hotelImage: hotelData.images[0] };
+                                }
+                            }
+                        } catch (err) {
+                            console.warn(`Failed to fetch fallback image for hotel ${item.hotelId}`, err);
+                        }
+                    }
+                    return item;
+                }));
+                setHistoryData(enhancedData);
+            } else {
+                setHistoryData(data);
+            }
         } catch (error) {
             console.error("Error fetching history:", error);
         } finally {
             setLoading(false);
         }
-    };
-
-    const formatDate = (timestamp: Timestamp | undefined) => {
-        if (!timestamp) return '';
-        return new Date(timestamp.seconds * 1000).toLocaleDateString('vi-VN');
     };
 
     const formatPrice = (price?: number) => {
@@ -98,41 +128,77 @@ export default function HistoryScreen() {
 
     const renderItem = ({ item }: { item: HistoryItem }) => {
         const isHotel = activeTab === 'HOTEL';
-        const title = isHotel ? item.hotelName : `${item.outboundFlightSnapshot?.from} - ${item.outboundFlightSnapshot?.to}`;
-        const subtitle = isHotel ? item.roomName : item.outboundFlightSnapshot?.airline;
-        const price = isHotel ? item.totalPrice : item.totalAmount;
+
+        let imageUrl = '';
+        let title = '';
+        let dateInfo = '';
+        let price = 0;
+
+        if (isHotel) {
+            title = item.hotelName || 'Khách sạn';
+            imageUrl = item.hotelImage || 'https://via.placeholder.com/150';
+            price = item.totalPrice || 0;
+
+            // Date formatting
+            const checkIn = item.checkInDate ? format(new Date(item.checkInDate), 'dd/MM/yyyy') : '';
+            const checkOut = item.checkOutDate ? format(new Date(item.checkOutDate), 'dd/MM/yyyy') : '';
+            dateInfo = `${checkIn} - ${checkOut}`;
+
+        } else {
+            // Flight
+            const flight = item.outboundFlightSnapshot;
+            title = flight ? `${flight.from} ➔ ${flight.to}` : 'Chuyến bay';
+            title = flight ? `${flight.from} ➔ ${flight.to}` : 'Chuyến bay';
+            // Prioritize persisted top-level images, then snapshot images, then placeholder
+            imageUrl = item.airlineLogo || item.bookingImage || flight?.airlineLogo || flight?.image || 'https://via.placeholder.com/150';
+            price = item.totalAmount || 0;
+
+            // Flight Date: HH:mm - dd/MM/yyyy
+            // Assuming flight.date is YYYY-MM-DD and flight.departureTime is HH:mm
+            let flightDateFormatted = '';
+            if (flight?.date) {
+                // Try to parse standard format
+                try {
+                    // If date is strict YYYY-MM-DD
+                    const d = new Date(flight.date);
+                    // Manual format or use date-fns if parsing works
+                    flightDateFormatted = format(d, 'dd/MM/yyyy');
+                } catch (e) {
+                    flightDateFormatted = flight.date; // Use raw if parse fails
+                }
+            }
+            dateInfo = `${flight?.departureTime || '--:--'} - ${flightDateFormatted}`;
+        }
 
         return (
-            <View style={styles.card}>
-                <View style={styles.cardHeader}>
-                    <View style={styles.iconContainer}>
-                        <Ionicons
-                            name={isHotel ? "bed" : "airplane"}
-                            size={20}
-                            color={Colors.white}
-                        />
-                    </View>
-                    <View style={styles.headerTextContainer}>
-                        <Text style={styles.bookingId}>Mã: {item.id.slice(0, 8).toUpperCase()}</Text>
-                        <Text style={styles.date}>{formatDate(item.createdAt)}</Text>
-                    </View>
-                    <View style={styles.statusBadge}>
-                        <Text style={styles.statusText}>Thành công</Text>
+            <TouchableOpacity
+                activeOpacity={0.9}
+                onPress={() => router.push({ pathname: '/history/detail', params: { bookingId: item.id, type: isHotel ? 'hotel' : 'flight' } })}
+            >
+                <View style={styles.card}>
+                    <View style={styles.row}>
+                        {/* Left: Image */}
+                        <Image source={{ uri: imageUrl }} style={styles.thumb} resizeMode="cover" />
+
+                        {/* Right: Info */}
+                        <View style={styles.infoContainer}>
+                            <Text style={styles.itemTitle} numberOfLines={2}>{title}</Text>
+
+                            <View style={styles.detailRow}>
+                                <Ionicons name="calendar-outline" size={14} color={Colors.textSecondary} />
+                                <Text style={styles.dateText}>{dateInfo}</Text>
+                            </View>
+
+                            <View style={styles.footerRow}>
+                                <Text style={styles.totalPrice}>{formatPrice(price)}</Text>
+                                <View style={styles.statusBadge}>
+                                    <Text style={styles.statusText}>Thành công</Text>
+                                </View>
+                            </View>
+                        </View>
                     </View>
                 </View>
-
-                <View style={styles.divider} />
-
-                <View style={styles.cardBody}>
-                    <Text style={styles.itemTitle}>{title}</Text>
-                    {subtitle && <Text style={styles.itemSubtitle}>{subtitle}</Text>}
-
-                    <View style={styles.priceRow}>
-                        <Text style={styles.totalLabel}>Tổng thanh toán</Text>
-                        <Text style={styles.totalPrice}>{formatPrice(price)}</Text>
-                    </View>
-                </View>
-            </View>
+            </TouchableOpacity>
         );
     };
 
@@ -157,8 +223,14 @@ export default function HistoryScreen() {
     }
 
     return (
-        <View style={[styles.container, { paddingTop: insets.top }]}>
-            <View style={styles.header}>
+        <View style={styles.container}>
+
+            <StatusBar barStyle="dark-content" translucent backgroundColor="transparent" />
+
+            {/* Remove the old header logic if replacing entirely, or adapt inline. User asked to "tách riêng phần Header" (separate Header). 
+                I will implement it inline first as a const or just JSX to match the request "Tạo một <View> làm nền cho Header...". 
+            */}
+            <View style={[styles.header, { height: 60 + insets.top, paddingTop: insets.top }]}>
                 <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
                     <Ionicons name="arrow-back" size={24} color={Colors.text} />
                 </TouchableOpacity>
@@ -217,6 +289,8 @@ const styles = StyleSheet.create({
         backgroundColor: Colors.white,
         borderBottomWidth: 1,
         borderBottomColor: Colors.border,
+        // Height and padding top are now dynamic via style prop
+        zIndex: 10,
     },
     backButton: {
         padding: 4,
@@ -280,58 +354,26 @@ const styles = StyleSheet.create({
         backgroundColor: Colors.white,
         borderRadius: 12,
         marginBottom: 16,
+        padding: 12,
         elevation: 2,
         shadowColor: '#000',
         shadowOffset: { width: 0, height: 2 },
         shadowOpacity: 0.1,
         shadowRadius: 4,
-        overflow: 'hidden',
     },
-    cardHeader: {
+    row: {
         flexDirection: 'row',
-        alignItems: 'center',
-        padding: 12,
-        backgroundColor: Colors.primary,
     },
-    iconContainer: {
-        width: 32,
-        height: 32,
-        borderRadius: 16,
-        backgroundColor: 'rgba(255,255,255,0.2)',
-        justifyContent: 'center',
-        alignItems: 'center',
-        marginRight: 12,
+    thumb: {
+        width: 80,
+        height: 80,
+        borderRadius: 8,
+        backgroundColor: '#eee',
     },
-    headerTextContainer: {
+    infoContainer: {
         flex: 1,
-    },
-    bookingId: {
-        color: Colors.white,
-        fontWeight: 'bold',
-        fontSize: 14,
-    },
-    date: {
-        color: 'rgba(255,255,255,0.8)',
-        fontSize: 12,
-    },
-    statusBadge: {
-        backgroundColor: Colors.success,
-        paddingHorizontal: 8,
-        paddingVertical: 4,
-        borderRadius: 4,
-    },
-    statusText: {
-        color: Colors.white,
-        fontSize: 10,
-        fontWeight: 'bold',
-        textTransform: 'uppercase',
-    },
-    divider: {
-        height: 1,
-        backgroundColor: Colors.border,
-    },
-    cardBody: {
-        padding: 16,
+        marginLeft: 12,
+        justifyContent: 'space-between',
     },
     itemTitle: {
         fontSize: 16,
@@ -339,24 +381,48 @@ const styles = StyleSheet.create({
         color: Colors.text,
         marginBottom: 4,
     },
-    itemSubtitle: {
-        fontSize: 14,
-        color: Colors.textSecondary,
-        marginBottom: 12,
+    detailRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 6,
     },
-    priceRow: {
+    dateText: {
+        fontSize: 13,
+        color: Colors.textSecondary,
+    },
+    footerRow: {
         flexDirection: 'row',
         justifyContent: 'space-between',
         alignItems: 'center',
-        marginTop: 4,
-    },
-    totalLabel: {
-        fontSize: 14,
-        color: Colors.textSecondary,
+        marginTop: 6,
     },
     totalPrice: {
-        fontSize: 18,
+        fontSize: 16,
         fontWeight: 'bold',
         color: Colors.price,
+    },
+    contentContainer: {
+        flex: 1,
+        backgroundColor: Colors.background,
+        borderTopLeftRadius: 20,
+        borderTopRightRadius: 20,
+        marginTop: -10, // Slight overlap for modern look if desired, or 0
+        overflow: 'hidden',
+    },
+
+    itemSubtitle: {
+        fontSize: 13,
+        color: Colors.textSecondary,
+        marginBottom: 8,
+    }, statusBadge: {
+        backgroundColor: 'rgba(76, 175, 80, 0.1)',
+        paddingHorizontal: 8,
+        paddingVertical: 4,
+        borderRadius: 4,
+    },
+    statusText: {
+        color: Colors.success,
+        fontSize: 12,
+        fontWeight: '600',
     },
 });

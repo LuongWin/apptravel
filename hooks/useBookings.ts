@@ -22,6 +22,8 @@ export interface BookingData {
         nationality: string;
     }[];
     totalAmount: number;
+    airlineLogo?: string;
+    bookingImage?: string; // Generic fallback
 }
 
 export const useBookings = () => {

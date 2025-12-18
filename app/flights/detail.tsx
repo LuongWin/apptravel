@@ -14,6 +14,8 @@ const Colors = {
     inputBg: '#FAFAFA' // Slightly off-white for inputs
 };
 
+const FLIGHT_PLACEHOLDER = "https://via.placeholder.com/150?text=Flight+Logo"; // Fallback
+
 const FlightDetailScreen = () => {
     const insets = useSafeAreaInsets();
     const { id, booking } = useLocalSearchParams<{ id: string; booking: string }>();
@@ -109,6 +111,12 @@ const FlightDetailScreen = () => {
             return;
         }
 
+        // Logic fallback ảnh
+        const flightInfo = bookingDetails.outboundFlight;
+        const finalImage = flightInfo.airlineLogo && flightInfo.airlineLogo.length > 5
+            ? flightInfo.airlineLogo
+            : (flightInfo.image && flightInfo.image.length > 5 ? flightInfo.image : FLIGHT_PLACEHOLDER);
+
         // Construct Data
         const bookingData = {
             outboundFlightSnapshot: bookingDetails.outboundFlight,
@@ -118,7 +126,9 @@ const FlightDetailScreen = () => {
                 ...passenger,
                 dateOfBirth: `${passenger.year}-${passenger.month}-${passenger.day}` // Simple formatting
             }],
-            totalAmount: calculateTotal()
+            totalAmount: calculateTotal(),
+            airlineLogo: finalImage, // NEW: Lưu ảnh trực tiếp vào đơn hàng
+            bookingImage: finalImage // Redundant but safe
         };
 
         try {

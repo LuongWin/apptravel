@@ -102,7 +102,7 @@ const HotelDetailScreen = () => {
             checkOutDate: new Date(Date.now() + 86400000).toISOString(),
             guestCount: 2,
             totalNights: 1,
-            // Add hotel address or other needed info here if schema demands
+            address: hotel.address // Save address for history
         };
 
         router.push({

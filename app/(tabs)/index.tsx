@@ -1,4 +1,4 @@
-import { useRef, useEffect, useState } from "react";
+import { useRef, useEffect, useState, useCallback } from "react";
 import {
   StyleSheet,
   View,
@@ -11,9 +11,9 @@ import {
   ActivityIndicator,
   Alert,
 } from "react-native";
-import { useRouter } from "expo-router";
+import { useRouter, useFocusEffect } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
-import { collection, query, limit, getDocs, orderBy } from "firebase/firestore";
+import { collection, query, limit, getDocs, orderBy, doc, getDoc } from "firebase/firestore";
 import { db, auth } from "@/services/firebaseConfig";
 
 const { width } = Dimensions.get("window");
@@ -24,6 +24,25 @@ export default function Dashboard() {
   const [tours, setTours] = useState<any[]>([]);
   const [hotels, setHotels] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [userName, setUserName] = useState<string>("");
+
+  useFocusEffect(
+    useCallback(() => {
+      const fetchUserData = async () => {
+        if (auth.currentUser) {
+          try {
+            const userDoc = await getDoc(doc(db, "users", auth.currentUser.uid));
+            if (userDoc.exists()) {
+              setUserName(userDoc.data().fullName);
+            }
+          } catch (error) {
+            console.log("Error fetching user name:", error);
+          }
+        }
+      };
+      fetchUserData();
+    }, [])
+  );
 
   useEffect(() => {
     const fetchData = async () => {
@@ -128,10 +147,10 @@ export default function Dashboard() {
       {/* Header */}
       <View style={styles.header}>
         <View>
-          <Text style={styles.greetingText}>Xin chào, {auth.currentUser?.email || "Bạn"}</Text>
+          <Text style={styles.greetingText}>Xin chào, {userName || auth.currentUser?.email || "Bạn"}</Text>
           <Text style={styles.appName}>TravelGo!</Text>
         </View>
-        <Pressable style={styles.avatarButton}>
+        <Pressable style={styles.avatarButton} onPress={() => router.push('/profile')}>
           <Ionicons name="person-circle-outline" size={40} color="#fff" />
         </Pressable>
       </View>

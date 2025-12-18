@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { StyleSheet, View, Text, ScrollView, TouchableOpacity, ActivityIndicator, Alert, Image } from 'react-native';
+import { StyleSheet, View, Text, ScrollView, TouchableOpacity, ActivityIndicator, Alert, Image, StatusBar } from 'react-native';
 import { useLocalSearchParams, useRouter, Stack } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { doc, getDoc, Timestamp } from 'firebase/firestore';
@@ -35,7 +35,25 @@ export default function HistoryDetailScreen() {
                 const docSnap = await getDoc(docRef);
 
                 if (docSnap.exists()) {
-                    setBooking({ id: docSnap.id, ...docSnap.data() });
+                    let bookingData = { id: docSnap.id, ...docSnap.data() } as any;
+
+                    // Fallback for missing Hotel Image
+                    if (type === 'hotel' && (!bookingData.hotelImage || bookingData.hotelImage === '') && bookingData.hotelId) {
+                        try {
+                            const hotelRef = doc(db, 'HOTELS', bookingData.hotelId);
+                            const hotelSnap = await getDoc(hotelRef);
+                            if (hotelSnap.exists()) {
+                                const hotelData = hotelSnap.data();
+                                if (hotelData.images && hotelData.images.length > 0) {
+                                    bookingData.hotelImage = hotelData.images[0];
+                                }
+                            }
+                        } catch (err) {
+                            console.log("Error fetching fallback hotel image", err);
+                        }
+                    }
+
+                    setBooking(bookingData);
                 } else {
                     Alert.alert("Lỗi", "Không tìm thấy đơn hàng.");
                     router.back();
@@ -51,76 +69,7 @@ export default function HistoryDetailScreen() {
         fetchDetail();
     }, [bookingId, type]);
 
-    const handleRebook = () => {
-        if (!booking) return;
 
-        if (type === 'hotel') {
-            // Reconstruct Hotel Booking Payload
-            const price = booking.totalPrice && booking.totalNights && booking.roomQuantity ?
-                booking.totalPrice / (booking.totalNights * booking.roomQuantity) : 0;
-
-            const payload = {
-                hotelId: booking.hotelId,
-                hotelName: booking.hotelName,
-                roomId: booking.roomId,
-                roomName: booking.roomName,
-                checkInDate: new Date().toISOString(), // Use Current Date for new booking? User prompt implies pre-fill old info but maybe dates should be fresh? "chỉ cần chọn lại ngày".
-                // We pass the old dates, user can change them in the picker if we had one. 
-                // But the detail screen relies on passed dates to calculate price.
-                // Using TODAY as default might be safer or just keep old ones. 
-                // User said: "tự động điền (pre-fill) các thông tin cũ (như tên khách sạn, loại phòng) để người dùng chỉ cần chọn lại ngày"
-                // This implies we send them to a screen where they CAN select date.
-                // app/hotels/detail.tsx DOES display date but doesn't seem to have a picker?
-                // Wait, app/hotels/detail.tsx is "Confirmation". It displays what was passed.
-                // If we send them there, they might be locked into old dates unless that screen interacts.
-                // Actually, app/hotels/detail.tsx has NO date picker. It's a confirmation screen.
-                // So to "choose dates again", we should probably send them to the HOTEL DETAIL screen (app/hotels/hotel-detail.tsx) or RESULTS.
-                // But user specifically said "screen Fill Booking Info" (app/hotels/booking... which I assumed is detail.tsx).
-                // If I send them to app/hotels/detail.tsx, they can't change dates.
-                // However, following strict instruction: "điền thông tin đặt chỗ ... tự động điền thông tin cũ".
-                // I will send them key info. If they need to change dates, standard flow is: Search -> Detail -> Book.
-                // Direct Re-book to Booking Validation screen implies checking out same parameters.
-                // I will assume reusing old dates for now or maybe +1 day to avoid past dates.
-                // Let's use today + 1 for checkin to be safe if old date is past.
-
-                checkOutDate: new Date(Date.now() + 86400000).toISOString(),
-                totalNights: 1, // Reset or calc
-                roomPrice: price || 0,
-                hotelImage: booking.hotelImage || 'https://via.placeholder.com/150', // We might not have stored image? Check usage.
-                guestCount: booking.guestCount
-            };
-
-            // Actually, better logic: Redirect to the Hotel Details Page so they can browse/select Fresh Dates.
-            // But if I MUST go to Booking Confirmation:
-            // I will use current date logic: 
-            const today = new Date();
-            const tomorrow = new Date(today); tomorrow.setDate(today.getDate() + 1);
-            const dayAfter = new Date(tomorrow); dayAfter.setDate(tomorrow.getDate() + 1);
-
-            const rebookPayload = {
-                ...booking,
-                checkInDate: tomorrow.toISOString(),
-                checkOutDate: dayAfter.toISOString(),
-                totalNights: 1,
-                roomPrice: price
-            };
-
-            router.push({
-                pathname: '/hotels/detail',
-                params: { booking: JSON.stringify(rebookPayload) }
-            });
-        } else {
-            // Flight Re-book
-            // Flights are very date specific. Old flight might not exist.
-            // But "Re-book" usually means "Book this route again".
-            // app/flights/detail.tsx calculates based on passed object.
-
-            router.push({
-                pathname: '/flights/detail',
-                params: { booking: JSON.stringify(booking) }
-            });
-        }
-    };
 
     const formatDate = (timestamp: any) => {
         if (!timestamp) return '';
@@ -143,17 +92,127 @@ export default function HistoryDetailScreen() {
     if (!booking) return null;
 
     const isHotel = type === 'hotel';
+    const hotelImage = booking.hotelImage || booking.image || booking.imageUrl || 'https://via.placeholder.com/400x300?text=Hotel+Image';
 
+    if (isHotel) {
+        return (
+            <View style={styles.container}>
+                <StatusBar barStyle="light-content" translucent backgroundColor="transparent" />
+                <Stack.Screen options={{ headerShown: false }} />
+
+                {/* Hero Image */}
+                <View style={[styles.heroContainer, { backgroundColor: '#EEE' }]}>
+                    <Image
+                        source={{ uri: hotelImage }}
+                        style={styles.heroImage}
+                        resizeMode="cover"
+                        onError={(e) => console.log('Image Load Error', e.nativeEvent.error)}
+                    />
+                    {/* Gradient overlay for text readability if needed, or just header bg */}
+                    <View style={styles.heroOverlay} />
+                </View>
+
+                {/* Custom Absolute Header */}
+                <View style={[styles.absoluteHeader, { top: insets.top + 10 }]}>
+                    <TouchableOpacity onPress={() => router.back()} style={styles.roundBackButton}>
+                        <Ionicons name="arrow-back" size={24} color={Colors.white} />
+                    </TouchableOpacity>
+                </View>
+
+                <ScrollView contentContainerStyle={styles.scrollContentHotel} showsVerticalScrollIndicator={false}>
+                    <View style={styles.hotelContentCard}>
+                        {/* Title & Address */}
+                        <Text style={styles.hotelTitle}>{booking.hotelName}</Text>
+                        <View style={styles.addressRow}>
+                            <Ionicons name="location-outline" size={16} color={Colors.textSecondary} />
+                            <Text style={styles.addressText}>{booking.address || 'Địa chỉ đang cập nhật'}</Text>
+                        </View>
+
+                        <View style={styles.divider} />
+
+                        {/* Status Badge */}
+                        <View style={styles.row}>
+                            <Text style={styles.label}>Trạng thái</Text>
+                            <View style={styles.statusBadge}>
+                                <Text style={styles.statusText}>Thành công</Text>
+                            </View>
+                        </View>
+                        <View style={[styles.row, { marginTop: 10 }]}>
+                            <Text style={styles.label}>Mã đơn hàng</Text>
+                            <Text style={styles.valueCopy}>{booking.id.slice(0, 8).toUpperCase()}</Text>
+                        </View>
+
+                        <View style={styles.divider} />
+
+                        {/* Booking Details Grid */}
+                        <Text style={styles.sectionTitle}>Chi tiết đặt phòng</Text>
+
+                        <View style={styles.detailGrid}>
+                            <View style={styles.detailItem}>
+                                <Text style={styles.detailLabel}>Nhận phòng</Text>
+                                <Text style={styles.detailValue}>{format(new Date(booking.checkInDate), 'dd/MM/yyyy')}</Text>
+                            </View>
+                            <View style={styles.detailItem}>
+                                <Text style={styles.detailLabel}>Trả phòng</Text>
+                                <Text style={styles.detailValue}>{format(new Date(booking.checkOutDate), 'dd/MM/yyyy')}</Text>
+                            </View>
+                        </View>
+
+                        <View style={[styles.detailGrid, { marginTop: 15 }]}>
+                            <View style={styles.detailItem}>
+                                <Text style={styles.detailLabel}>Loại phòng</Text>
+                                <Text style={styles.detailValue}>{booking.roomName}</Text>
+                            </View>
+                            <View style={styles.detailItem}>
+                                <Text style={styles.detailLabel}>Số phòng</Text>
+                                <Text style={styles.detailValue}>{booking.roomQuantity || 1}</Text>
+                            </View>
+                        </View>
+
+                        <View style={styles.divider} />
+
+                        {/* User Info */}
+                        <Text style={styles.sectionTitle}>Thông tin khách hàng</Text>
+                        <View style={styles.infoRow}>
+                            <Ionicons name="person-outline" size={18} color={Colors.textSecondary} />
+                            <Text style={styles.infoText}>{booking.contactInfo?.lastName} {booking.contactInfo?.firstName}</Text>
+                        </View>
+                        <View style={styles.infoRow}>
+                            <Ionicons name="call-outline" size={18} color={Colors.textSecondary} />
+                            <Text style={styles.infoText}>{booking.contactInfo?.phoneNumber}</Text>
+                        </View>
+                        <View style={styles.infoRow}>
+                            <Ionicons name="mail-outline" size={18} color={Colors.textSecondary} />
+                            <Text style={styles.infoText}>{booking.contactInfo?.email}</Text>
+                        </View>
+
+                        <View style={styles.divider} />
+
+                        {/* Price */}
+                        <View style={styles.row}>
+                            <Text style={styles.totalLabel}>Tổng thanh toán</Text>
+                            <Text style={styles.hotelTotalPrice}>{formatPrice(booking.totalPrice)}</Text>
+                        </View>
+
+                    </View>
+
+                    <View style={{ height: 100 }} />
+                </ScrollView >
+            </View >
+        );
+    }
+
+    // Default: Flight Layout (Preserved)
     return (
         <View style={[styles.container, { paddingTop: insets.top }]}>
             <Stack.Screen options={{ headerShown: false }} />
 
-            {/* Header */}
+            {/* Simple Header */}
             <View style={styles.header}>
                 <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
                     <Ionicons name="arrow-back" size={24} color={Colors.text} />
                 </TouchableOpacity>
-                <Text style={styles.headerTitle}>Chi tiết đơn hàng</Text>
+                <Text style={styles.headerTitle}>Chi tiết vé máy bay</Text>
                 <View style={{ width: 40 }} />
             </View>
 
@@ -179,52 +238,27 @@ export default function HistoryDetailScreen() {
 
                 {/* Product Detail */}
                 <View style={styles.card}>
-                    <Text style={styles.sectionTitle}>Thông tin sản phẩm</Text>
+                    <Text style={styles.sectionTitle}>Thông tin chuyến bay</Text>
 
-                    {isHotel ? (
-                        <>
-                            <View style={styles.productRow}>
-                                <Ionicons name="business" size={24} color={Colors.primary} />
-                                <View style={styles.productInfo}>
-                                    <Text style={styles.productName}>{booking.hotelName}</Text>
-                                    <Text style={styles.productSub}>{booking.roomName}</Text>
-                                </View>
-                            </View>
-                            <View style={styles.divider} />
-                            <View style={styles.row}>
-                                <Text style={styles.label}>Nhận phòng</Text>
-                                <Text style={styles.value}>{format(new Date(booking.checkInDate), 'dd/MM/yyyy')}</Text>
-                            </View>
-                            <View style={[styles.row, { marginTop: 8 }]}>
-                                <Text style={styles.label}>Trả phòng</Text>
-                                <Text style={styles.value}>{format(new Date(booking.checkOutDate), 'dd/MM/yyyy')}</Text>
-                            </View>
-                            <View style={[styles.row, { marginTop: 8 }]}>
-                                <Text style={styles.label}>Số lượng</Text>
-                                <Text style={styles.value}>{booking.roomQuantity || 1} phòng</Text>
-                            </View>
-                        </>
-                    ) : (
-                        <>
-                            <View style={styles.productRow}>
-                                <Ionicons name="airplane" size={24} color={Colors.primary} />
-                                <View style={styles.productInfo}>
-                                    <Text style={styles.productName}>{booking.outboundFlightSnapshot?.airline}</Text>
-                                    <Text style={styles.productSub}>{booking.outboundFlightSnapshot?.from} ➔ {booking.outboundFlightSnapshot?.to}</Text>
-                                </View>
-                            </View>
-                            <View style={styles.divider} />
-                            <View style={styles.row}>
-                                <Text style={styles.label}>Ngày đi</Text>
-                                <Text style={styles.value}>{booking.outboundFlightSnapshot?.date}</Text>
-                            </View>
-                            <View style={[styles.row, { marginTop: 8 }]}>
-                                <Text style={styles.label}>Giờ đi</Text>
-                                <Text style={styles.value}>{booking.outboundFlightSnapshot?.departureTime}</Text>
-                            </View>
-                            {/* Return flight info if exists */}
-                        </>
-                    )}
+                    <View style={styles.productRow}>
+                        <Image
+                            source={{ uri: booking.airlineLogo || booking.bookingImage || 'https://via.placeholder.com/50' }}
+                            style={{ width: 40, height: 40, borderRadius: 20, marginRight: 10 }}
+                        />
+                        <View style={styles.productInfo}>
+                            <Text style={styles.productName}>{booking.outboundFlightSnapshot?.airline}</Text>
+                            <Text style={styles.productSub}>{booking.outboundFlightSnapshot?.from} ➔ {booking.outboundFlightSnapshot?.to}</Text>
+                        </View>
+                    </View>
+                    <View style={styles.divider} />
+                    <View style={styles.row}>
+                        <Text style={styles.label}>Ngày đi</Text>
+                        <Text style={styles.value}>{booking.outboundFlightSnapshot?.date}</Text>
+                    </View>
+                    <View style={[styles.row, { marginTop: 8 }]}>
+                        <Text style={styles.label}>Giờ đi</Text>
+                        <Text style={styles.value}>{booking.outboundFlightSnapshot?.departureTime}</Text>
+                    </View>
                 </View>
 
                 {/* Pricing */}
@@ -233,7 +267,7 @@ export default function HistoryDetailScreen() {
                     <View style={styles.row}>
                         <Text style={styles.totalLabel}>Tổng tiền</Text>
                         <Text style={styles.totalPrice}>
-                            {formatPrice(isHotel ? booking.totalPrice : booking.totalAmount)}
+                            {formatPrice(booking.totalAmount)}
                         </Text>
                     </View>
                 </View>
@@ -255,20 +289,17 @@ export default function HistoryDetailScreen() {
                     </View>
                 </View>
 
-            </ScrollView>
 
-            {/* Bottom Button */}
-            <View style={styles.footer}>
-                <TouchableOpacity style={styles.rebookButton} onPress={handleRebook}>
-                    <Text style={styles.rebookText}>Đặt lại</Text>
-                </TouchableOpacity>
-            </View>
+
+            </ScrollView>
         </View>
     );
 }
 
 const styles = StyleSheet.create({
     container: { flex: 1, backgroundColor: Colors.background },
+
+    // Flight Header
     header: {
         flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
         paddingHorizontal: 16, paddingBottom: 12, backgroundColor: Colors.white,
@@ -278,6 +309,7 @@ const styles = StyleSheet.create({
     headerTitle: { fontSize: 18, fontWeight: 'bold', color: Colors.text },
     content: { padding: 16, paddingBottom: 100 },
 
+    // Core Components
     card: {
         backgroundColor: Colors.white, borderRadius: 12, padding: 16, marginBottom: 16,
         elevation: 2, shadowColor: '#000', shadowOffset: { width: 0, height: 1 },
@@ -286,6 +318,7 @@ const styles = StyleSheet.create({
     row: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
     label: { fontSize: 14, color: Colors.textSecondary },
     value: { fontSize: 14, fontWeight: '500', color: Colors.text },
+    valueCopy: { fontSize: 14, fontWeight: 'bold', color: Colors.text, fontFamily: 'monospace' },
 
     statusBadge: { backgroundColor: Colors.success, paddingHorizontal: 8, paddingVertical: 4, borderRadius: 4 },
     statusText: { color: Colors.white, fontSize: 12, fontWeight: 'bold' },
@@ -302,14 +335,67 @@ const styles = StyleSheet.create({
     totalLabel: { fontSize: 16, fontWeight: 'bold', color: Colors.text },
     totalPrice: { fontSize: 20, fontWeight: 'bold', color: Colors.price },
 
-    footer: {
-        position: 'absolute', bottom: 0, left: 0, right: 0,
-        backgroundColor: Colors.white, padding: 16,
-        borderTopWidth: 1, borderTopColor: Colors.border,
+
+
+    // --- HOTEL SPECIFIC STYLES ---
+    absoluteHeader: {
+        position: 'absolute', left: 16, zIndex: 10,
     },
-    rebookButton: {
-        backgroundColor: Colors.primary, borderRadius: 8, paddingVertical: 14,
-        alignItems: 'center',
+    roundBackButton: {
+        backgroundColor: 'rgba(0,0,0,0.4)',
+        padding: 8, borderRadius: 20,
+        shadowColor: "#000", shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.1, shadowRadius: 4, elevation: 3
     },
-    rebookText: { color: Colors.white, fontSize: 16, fontWeight: 'bold' },
+    heroContainer: {
+        height: 350, width: '100%', position: 'absolute', top: 0,
+    },
+    heroImage: {
+        width: '100%', height: '100%'
+    },
+    heroOverlay: {
+        ...StyleSheet.absoluteFillObject,
+        backgroundColor: 'rgba(0,0,0,0.2)'
+    },
+    scrollContentHotel: {
+        paddingTop: 300, // Overlap image (Hero 350 - 50 overlap)
+        paddingBottom: 100
+    },
+    hotelContentCard: {
+        backgroundColor: Colors.white,
+        borderTopLeftRadius: 24, borderTopRightRadius: 24,
+        padding: 24,
+        minHeight: 500,
+        marginTop: -30,
+        elevation: 4, shadowColor: '#000', shadowOffset: { width: 0, height: -2 }, shadowOpacity: 0.1, shadowRadius: 4
+    },
+    hotelTitle: {
+        fontSize: 22, fontWeight: 'bold', color: Colors.text, marginBottom: 8, marginRight: 10
+    },
+    addressRow: {
+        flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 15
+    },
+    addressText: {
+        fontSize: 14, color: Colors.textSecondary, flex: 1
+    },
+    detailGrid: {
+        flexDirection: 'row', justifyContent: 'space-between'
+    },
+    detailItem: {
+        flex: 1,
+    },
+    detailLabel: {
+        fontSize: 13, color: Colors.textSecondary, marginBottom: 4
+    },
+    detailValue: {
+        fontSize: 15, fontWeight: '600', color: Colors.text
+    },
+    infoRow: {
+        flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 10
+    },
+    infoText: {
+        fontSize: 15, color: Colors.text
+    },
+    hotelTotalPrice: {
+        fontSize: 24, fontWeight: 'bold', color: Colors.price
+    }
 });

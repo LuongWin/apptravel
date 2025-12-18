@@ -19,6 +19,8 @@ export interface HotelBookingData {
     };
     guestCount: number;
     roomQuantity?: number;
+    hotelImage?: string;
+    address?: string;
 }
 
 export const useHotelBookings = () => {

@@ -22,6 +22,7 @@ export default function Dashboard() {
   const router = useRouter();
   const [flights, setFlights] = useState<any[]>([]);
   const [tours, setTours] = useState<any[]>([]);
+  const [hotels, setHotels] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -48,6 +49,16 @@ export default function Dashboard() {
           ...doc.data(),
         }));
         setTours(tourData);
+
+        // 3. Fetch Featured Hotels
+        const hotelsRef = collection(db, "HOTELS");
+        const qHotels = query(hotelsRef, limit(5));
+        const hotelSnap = await getDocs(qHotels);
+        const hotelData = hotelSnap.docs.map((doc) => ({
+          id: doc.id,
+          ...doc.data(),
+        }));
+        setHotels(hotelData);
       } catch (error) {
         console.log("Error fetching dashboard data:", error);
         // Alert.alert("Lỗi", "Không thể tải dữ liệu gợi ý.");
@@ -148,13 +159,68 @@ export default function Dashboard() {
             </View>
             <FlatList
               data={flights}
-              renderItem={renderFlightItem}
+              renderItem={({ item }) => (
+                <Pressable
+                  style={styles.card}
+                  onPress={() => router.push({ pathname: "/flights/detail", params: { id: item.id } })}
+                >
+                  <Image
+                    source={{ uri: "https://images.unsplash.com/photo-1436491865332-7a61a109cc05?q=80&w=2074&auto=format&fit=crop" }}
+                    style={styles.cardImage}
+                  />
+                  <View style={styles.cardContent}>
+                    <Text style={styles.cardTitle} numberOfLines={1}>
+                      {item.from} - {item.to}
+                    </Text>
+                    <Text style={styles.cardPrice}>{formatCurrency(item.price)}</Text>
+                    <Text style={styles.airlineText}>{item.airline}</Text>
+                  </View>
+                </Pressable>
+              )}
               keyExtractor={(item) => item.id}
               horizontal
               showsHorizontalScrollIndicator={false}
               contentContainerStyle={styles.listContent}
               ListEmptyComponent={<Text style={styles.emptyText}>Chưa có chuyến bay nào.</Text>}
             />
+
+            {/* Featured Hotels */}
+            <View style={styles.sectionHeader}>
+              <Text style={styles.sectionTitle}>Khách sạn ưu đãi</Text>
+              <Pressable onPress={() => router.push("/hotels")}>
+                <Text style={styles.seeAll}>Xem tất cả</Text>
+              </Pressable>
+            </View>
+            <FlatList
+              data={hotels}
+              renderItem={({ item }) => (
+                <Pressable
+                  style={styles.card}
+                  onPress={() => router.push({ pathname: "/hotels/hotel-detail", params: { id: item.id } })}
+                >
+                  <Image
+                    source={{ uri: item.images?.[0] || "https://images.unsplash.com/photo-1566073771259-6a8506099945?q=80&w=2070&auto=format&fit=crop" }}
+                    style={styles.cardImage}
+                  />
+                  <View style={styles.cardContent}>
+                    <Text style={styles.cardTitle} numberOfLines={1}>
+                      {item.name}
+                    </Text>
+                    <Text style={styles.cardPrice}>{formatCurrency(item.rooms?.[0]?.price || 0)}</Text>
+                    <View style={styles.locationRow}>
+                      <Ionicons name="location-outline" size={14} color="#666" />
+                      <Text style={styles.locationText} numberOfLines={1}>{item.address}</Text>
+                    </View>
+                  </View>
+                </Pressable>
+              )}
+              keyExtractor={(item) => item.id}
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              contentContainerStyle={styles.listContent}
+              ListEmptyComponent={<Text style={styles.emptyText}>Chưa có khách sạn nào.</Text>}
+            />
+
 
             {/* Featured Tours */}
             <View style={styles.sectionHeader}>
@@ -165,7 +231,27 @@ export default function Dashboard() {
             </View>
             <FlatList
               data={tours}
-              renderItem={renderTourItem}
+              renderItem={({ item }) => (
+                <Pressable
+                  style={styles.card}
+                  onPress={() => router.push({ pathname: "/tours/detail", params: { id: item.id } })}
+                >
+                  <Image
+                    source={{ uri: item.image || "https://images.unsplash.com/photo-1469854523086-cc02fe5d8800?q=80&w=2021&auto=format&fit=crop" }}
+                    style={styles.cardImage}
+                  />
+                  <View style={styles.cardContent}>
+                    <Text style={styles.cardTitle} numberOfLines={2}>
+                      {item.name}
+                    </Text>
+                    <Text style={styles.cardPrice}>{formatCurrency(item.price)}</Text>
+                    <View style={styles.locationRow}>
+                      <Ionicons name="location-outline" size={14} color="#666" />
+                      <Text style={styles.locationText}>{item.location || "Việt Nam"}</Text>
+                    </View>
+                  </View>
+                </Pressable>
+              )}
               keyExtractor={(item) => item.id}
               horizontal
               showsHorizontalScrollIndicator={false}

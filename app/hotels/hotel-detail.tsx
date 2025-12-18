@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { StyleSheet, View, Text, ScrollView, Image, TouchableOpacity, Button, Dimensions, FlatList } from 'react-native';
+import React, { useState, useEffect } from 'react';
+import { StyleSheet, View, Text, ScrollView, Image, TouchableOpacity, Button, Dimensions, FlatList, Alert, ActivityIndicator } from 'react-native';
 import { useLocalSearchParams, Stack, router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { Hotel, Room } from '@/hooks/useHotels';
@@ -26,37 +26,73 @@ const getAmenityIcon = (amenity: string): keyof typeof Ionicons.glyphMap => {
     return 'checkmark-circle-outline';
 };
 
-const HotelDetailScreen = () => {
-    const params = useLocalSearchParams<{
-        hotel: string; checkInDate: string; checkOutDate: string; guestCount: string; totalNights: string;
-    }>();
+import { doc, getDoc } from 'firebase/firestore';
+import { db } from '@/services/firebaseConfig';
 
-    const hotel: Hotel = JSON.parse(params.hotel);
-    const rooms = hotel.rooms || [];
-    const minPrice = rooms.length > 0 ? Math.min(...rooms.map(r => r.price)) : 0;
+// ... imports
+
+const HotelDetailScreen = () => {
+    const { id } = useLocalSearchParams<{ id: string }>();
+    const [hotel, setHotel] = useState<Hotel | null>(null);
+    const [loadingData, setLoadingData] = useState(true);
+
+    const rooms = hotel?.rooms || [];
+    // const minPrice = rooms.length > 0 ? Math.min(...rooms.map(r => r.price)) : 0; // Not used currently
 
     const [activeImage, setActiveImage] = useState(0);
 
+    useEffect(() => {
+        const fetchHotel = async () => {
+            if (!id) return;
+            try {
+                setLoadingData(true);
+                const docRef = doc(db, "HOTELS", id);
+                const docSnap = await getDoc(docRef);
+
+                if (docSnap.exists()) {
+                    setHotel({ id: docSnap.id, ...docSnap.data() } as Hotel);
+                } else {
+                    Alert.alert("Lỗi", "Khách sạn không tồn tại.");
+                    router.back();
+                }
+            } catch (error) {
+                console.error("Error fetching hotel:", error);
+                Alert.alert("Lỗi", "Không thể tải thông tin khách sạn.");
+            } finally {
+                setLoadingData(false);
+            }
+        };
+        fetchHotel();
+    }, [id]);
+
+
     const handleRoomSelect = (room: Room) => {
+        if (!hotel) return;
+
+        const bookingData = {
+            hotelId: hotel.id,
+            roomId: room.id,
+            hotelName: hotel.name,
+            roomName: room.name,
+            roomPrice: room.price,
+            hotelImage: hotel.images?.[0] || HOTEL_PLACEHOLDER,
+            checkInDate: new Date().toISOString(),
+            checkOutDate: new Date(Date.now() + 86400000).toISOString(),
+            guestCount: 2,
+            totalNights: 1,
+            // Add hotel address or other needed info here if schema demands
+        };
+
         router.push({
             pathname: '/hotels/detail', // Booking Screen
             params: {
-                hotelId: hotel.id,
-                roomId: room.id,
-                hotelName: hotel.name,
-                roomName: room.name,
-                roomPrice: room.price.toString(),
-                hotelImage: hotel.images[0], // Pass query image for summary
-                checkInDate: params.checkInDate,
-                checkOutDate: params.checkOutDate,
-                guestCount: params.guestCount,
-                totalNights: params.totalNights,
+                booking: JSON.stringify(bookingData)
             }
         });
     };
 
     const renderRoomItem = (room: Room) => {
-        const roomImage = room.image || hotel.images[0]; // Fallback if room has no image
+        const roomImage = room.image || hotel?.images?.[0] || HOTEL_PLACEHOLDER; // Fallback if room has no image
         return (
             <View style={styles.roomCard} key={room.id}>
                 <View style={styles.roomImageContainer}>
@@ -83,6 +119,16 @@ const HotelDetailScreen = () => {
         );
     };
 
+    if (loadingData) {
+        return (
+            <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
+                <ActivityIndicator size="large" color={Colors.primary} />
+            </View>
+        );
+    }
+
+    if (!hotel) return null;
+
     return (
         <ScrollView style={styles.container} bounces={false}>
             <Stack.Screen options={{
@@ -90,7 +136,8 @@ const HotelDetailScreen = () => {
                 headerTransparent: true,
                 headerTintColor: '#fff',
                 headerBlurEffect: 'dark',
-                headerTitleStyle: { color: 'rgba(0,0,0,0)' } // Hide title in header initially if wanted, or show
+                headerTitleStyle: { color: 'rgba(0,0,0,0)' },
+                headerBackTitle: "Quay lại"
             }} />
 
             {/* Image Slider */}

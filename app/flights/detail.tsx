@@ -3,7 +3,9 @@ import { StyleSheet, View, Text, ScrollView, TextInput, TouchableOpacity, Alert,
 import { useLocalSearchParams, Stack, router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useBookings } from '@/hooks/useBookings';
-import { auth } from '@/services/firebaseConfig';
+import { doc, getDoc } from 'firebase/firestore';
+import { db, auth } from '@/services/firebaseConfig';
+import { ActivityIndicator } from 'react-native';
 
 const Colors = {
     primary: '#5B37B7', text: '#333', textSecondary: '#666', background: '#F5F5F5',
@@ -12,8 +14,9 @@ const Colors = {
 };
 
 const FlightDetailScreen = () => {
-    const params = useLocalSearchParams<{ booking: string }>();
+    const { id, booking } = useLocalSearchParams<{ id: string; booking: string }>();
     const [bookingDetails, setBookingDetails] = useState<any>(null);
+    const [loadingData, setLoadingData] = useState(true);
     const { createBooking, loading } = useBookings();
 
     // Form State
@@ -31,7 +34,6 @@ const FlightDetailScreen = () => {
     useEffect(() => {
         const user = auth.currentUser;
         if (user) {
-            // Attempt to pre-fill email and maybe name if stored in profile
             setContactInfo(prev => ({
                 ...prev,
                 email: user.email || '',
@@ -41,25 +43,53 @@ const FlightDetailScreen = () => {
         }
     }, []);
 
-
     useEffect(() => {
-        if (params.booking) {
-            try {
-                setBookingDetails(JSON.parse(params.booking));
-            } catch (e) {
-                console.error("Error parsing booking details:", e);
-                Alert.alert("Lỗi", "Không thể tải thông tin chuyến bay.");
-                router.back();
+        const fetchFlight = async () => {
+            if (booking) {
+                try {
+                    const parsed = JSON.parse(booking);
+                    setBookingDetails(parsed);
+                    setLoadingData(false);
+                } catch (e) {
+                    console.error("Error parsing booking data", e);
+                    Alert.alert("Lỗi", "Dữ liệu đặt vé không hợp lệ");
+                    router.back();
+                }
+                return;
             }
-        }
-    }, [params.booking]);
+
+            if (!id) return;
+            try {
+                setLoadingData(true);
+                const docRef = doc(db, "FLIGHTS", id);
+                const docSnap = await getDoc(docRef);
+
+                if (docSnap.exists()) {
+                    setBookingDetails({
+                        outboundFlight: { id: docSnap.id, ...docSnap.data() },
+                        returnFlight: null
+                    });
+                } else {
+                    Alert.alert("Lỗi", "Chuyến bay không tồn tại.");
+                    router.back();
+                }
+            } catch (error) {
+                console.error("Error fetching flight:", error);
+                Alert.alert("Lỗi", "Không thể tải thông tin chuyến bay.");
+            } finally {
+                setLoadingData(false);
+            }
+        };
+
+        fetchFlight();
+    }, [id, booking]);
 
     const calculateTotal = () => {
         if (!bookingDetails) return 0;
         let total = bookingDetails.outboundFlight?.price || 0;
-        if (bookingDetails.returnFlight) {
-            total += bookingDetails.returnFlight.price;
-        }
+        // if (bookingDetails.returnFlight) {
+        //     total += bookingDetails.returnFlight.price;
+        // }
         return total;
     };
 
@@ -96,11 +126,19 @@ const FlightDetailScreen = () => {
         }
     };
 
+    if (loadingData) {
+        return (
+            <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
+                <ActivityIndicator size="large" color={Colors.primary} />
+            </View>
+        );
+    }
+
     if (!bookingDetails) return null;
 
     return (
         <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={{ flex: 1 }}>
-            <Stack.Screen options={{ title: 'Thông tin đặt chỗ', headerBackTitle: '' }} />
+            <Stack.Screen options={{ title: 'Thông tin đặt chỗ', headerBackTitle: 'Quay lại' }} />
 
             <ScrollView style={styles.container} contentContainerStyle={{ paddingBottom: 100 }}>
 

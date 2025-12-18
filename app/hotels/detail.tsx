@@ -4,6 +4,7 @@ import { useLocalSearchParams, Stack, router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useHotelBookings } from '@/hooks/useHotelBookings';
 import { format } from 'date-fns';
+import { auth } from '@/services/firebaseConfig';
 
 const Colors = {
     primary: '#5B37B7', text: '#333', textSecondary: '#666', background: '#F9F9F9',
@@ -11,12 +12,8 @@ const Colors = {
 };
 
 const HotelBookingDetailScreen = () => {
-    const params = useLocalSearchParams<{
-        hotelId: string; roomId: string;
-        hotelName: string; roomName: string; roomPrice: string;
-        hotelImage: string; checkInDate: string; checkOutDate: string;
-        guestCount: string; totalNights: string;
-    }>();
+    const { booking } = useLocalSearchParams<{ booking: string }>();
+    const [bookingDetails, setBookingDetails] = React.useState<any>(null);
 
     const { createBooking, loading } = useHotelBookings();
 
@@ -25,31 +22,51 @@ const HotelBookingDetailScreen = () => {
     const [email, setEmail] = useState('');
     const [phone, setPhone] = useState('');
 
-    const pricePerNight = parseInt(params.roomPrice || '0');
-    const nights = parseInt(params.totalNights || '1');
-    const totalPrice = pricePerNight * nights;
+    // Parse booking data
+    React.useEffect(() => {
+        if (booking) {
+            try {
+                setBookingDetails(JSON.parse(booking));
+            } catch (e) {
+                Alert.alert("Lỗi", "Dữ liệu đặt phòng không hợp lệ");
+                router.back();
+            }
+        }
+    }, [booking]);
 
-    const formattedCheckIn = format(new Date(params.checkInDate), 'dd/MM/yyyy');
-    const formattedCheckOut = format(new Date(params.checkOutDate), 'dd/MM/yyyy');
+    // Auto-fill
+    React.useEffect(() => {
+        const user = auth.currentUser;
+        if (user) {
+            setEmail(user.email || '');
+            const names = (user.displayName || '').split(' ');
+            setFirstName(names.pop() || '');
+            setLastName(names.join(' '));
+        }
+    }, []);
 
     const handleConfirmBooking = async () => {
+        if (!bookingDetails) return;
+
         if (!firstName || !lastName || !email || !phone) {
             Alert.alert("Thiếu thông tin", "Vui lòng điền đầy đủ thông tin khách hàng.");
             return;
         }
 
         try {
+            const totalPrice = (bookingDetails.roomPrice || 0) * (bookingDetails.totalNights || 1);
+
             await createBooking({
-                hotelId: params.hotelId as string,
-                hotelName: params.hotelName,
-                roomId: params.roomId as string,
-                roomName: params.roomName,
-                checkInDate: params.checkInDate,
-                checkOutDate: params.checkOutDate,
-                totalNights: nights,
+                hotelId: bookingDetails.hotelId,
+                hotelName: bookingDetails.hotelName,
+                roomId: bookingDetails.roomId,
+                roomName: bookingDetails.roomName,
+                checkInDate: bookingDetails.checkInDate,
+                checkOutDate: bookingDetails.checkOutDate,
+                totalNights: bookingDetails.totalNights,
                 totalPrice: totalPrice,
                 contactInfo: { firstName, lastName, email, phoneNumber: phone },
-                guestCount: parseInt(params.guestCount),
+                guestCount: bookingDetails.guestCount || 2,
             });
 
             Alert.alert("Thành công", "Đặt phòng thành công!", [
@@ -60,6 +77,20 @@ const HotelBookingDetailScreen = () => {
         }
     };
 
+    if (!bookingDetails) {
+        return (
+            <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
+                <ActivityIndicator size="large" color={Colors.primary} />
+            </View>
+        );
+    }
+
+    const pricePerNight = bookingDetails.roomPrice || 0;
+    const nights = bookingDetails.totalNights || 1;
+    const totalPrice = pricePerNight * nights;
+    const formattedCheckIn = format(new Date(bookingDetails.checkInDate), 'dd/MM/yyyy');
+    const formattedCheckOut = format(new Date(bookingDetails.checkOutDate), 'dd/MM/yyyy');
+
     return (
         <ScrollView style={styles.container}>
             <Stack.Screen options={{ title: "Xác nhận đặt phòng", headerTitleStyle: { fontWeight: 'bold' } }} />
@@ -67,10 +98,10 @@ const HotelBookingDetailScreen = () => {
             {/* Hotel Summary */}
             <View style={styles.card}>
                 <View style={styles.hotelRow}>
-                    <Image source={{ uri: params.hotelImage }} style={styles.hotelThumb} />
+                    <Image source={{ uri: bookingDetails.hotelImage }} style={styles.hotelThumb} />
                     <View style={styles.hotelInfo}>
-                        <Text style={styles.hotelName}>{params.hotelName}</Text>
-                        <Text style={styles.roomName}>{params.roomName}</Text>
+                        <Text style={styles.hotelName}>{bookingDetails.hotelName}</Text>
+                        <Text style={styles.roomName}>{bookingDetails.roomName}</Text>
                         <View style={styles.dateRow}>
                             <Ionicons name="calendar-outline" size={14} color={Colors.textSecondary} />
                             <Text style={styles.dateText}>{formattedCheckIn} - {formattedCheckOut} ({nights} đêm)</Text>

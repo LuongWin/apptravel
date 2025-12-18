@@ -1,31 +1,28 @@
-import React, { useState } from 'react';
-import { StyleSheet, View, Text, TouchableOpacity, ScrollView, Platform, Modal, Alert } from 'react-native';
+import React, { useState, useCallback } from 'react';
+import { StyleSheet, View, Text, TouchableOpacity, ScrollView, Platform, Modal, Alert, FlatList } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { Stack, router, useNavigation } from 'expo-router';
 import { format } from 'date-fns';
 import DateTimePicker from '@react-native-community/datetimepicker';
-import { useEffect, useCallback } from 'react';
 import { useFocusEffect } from '@react-navigation/native';
 
-// Reusing Components (assuming they are shared/exported correctly, usually helpful to have them in @/components)
-// Since CustomInput is not exported from a shared file in the provided context (it was inside flights/index.tsx), I will perform a quick check.
-// If not available, I'll implement inline or assume user refactored. 
-// SAFE BET: Re-implement small UI comp or reuse if I knew it was shared.
-// Based on previous chats, CustomInput was in flights/index.tsx locally? No, it was imported: `import { CustomInput } from '@/components/CustomInput';`
 import { ServiceTab } from '@/components/ServiceTab';
 import { CustomInput } from '@/components/CustomInput';
 
 const Colors = {
     primary: '#5B37B7', text: '#333', textSecondary: '#666', background: '#F9F9F9',
-    white: '#FFFFFF', border: '#E0E0E0',
+    white: '#FFFFFF', border: '#E0E0E0', success: '#28a745',
 };
+
+const LOCATIONS = ['Hà Nội', 'Đà Nẵng', 'TP.HCM'];
 
 const HotelSearchScreen = () => {
     const navigation = useNavigation();
     const [selectedTab, setSelectedTab] = useState('hotels');
     const [city, setCity] = useState('Đà Nẵng');
+    const [showLocations, setShowLocations] = useState(false); // Dropdown visibility
+
     const [checkInDate, setCheckInDate] = useState<Date>(new Date());
-    // Default check-out next day
     const [checkOutDate, setCheckOutDate] = useState<Date>(() => {
         const d = new Date();
         d.setDate(d.getDate() + 1);
@@ -36,74 +33,16 @@ const HotelSearchScreen = () => {
     const [showCheckOutPicker, setShowCheckOutPicker] = useState(false);
     const [guestCount, setGuestCount] = useState(2);
 
-    // Tab Press Listener to Reset Stack (Method A: useFocusEffect + getParent)
+    // Tab Press Listener (optional reset logic kept from previous)
     useFocusEffect(
         useCallback(() => {
-            // Get the Parent Navigator (Tab Navigator)
-            const parentNav = navigation.getParent();
-
-            if (!parentNav) return;
-
-            const unsubscribe = (parentNav as any).addListener('tabPress', (e: any) => {
-                // Determine if we should reset. 
-                // However, navigation.popToTop() works on the Stack. 
-                // Since 'navigation' here refers to the screen's navigator (likely the Stack if nested or just the Tab if direct).
-                // But usually in Expo Router (tabs)/index is root of that tab. 
-                // If we pushed to /hotels/results (outside tabs), this listener in (tabs)/index might not be active or relevant unless we consider how Expo Router handles Stacks on top of Tabs.
-                // Wait, if /hotels/results is global (outside tabs), then (tabs) is hidden. 
-                // The user wants: "Nếu Stack hiện tại không ở màn hình gốc (index.tsx), thực hiện reset Stack".
-                // This usually implies we are IN a Stack nested inside the Tab.
-                // But /hotels/results is defined as `app/hotels/results.tsx` which is OUTSIDE `(tabs)`. 
-                // So when in Results, the Tab bar is likely hidden (common in standard native apps) OR if presented modally.
-                // IF the Tab Bar is visible, then we are inside the context.
-                // If the app structure is app/(tabs)/... and we push to /hotels/..., we are likely leaving the Tab context partially or fully depending on _layout.
-                // BUT the User Request says: "Reset Stack (ví dụ: router.replace('/hotels') hoặc sử dụng navigation.popToTop())".
-
-                // Let's implement the safe reset:
-                // If we are deeper in the stack, go back.
-
-                // Note: 'tabPress' is triggered on the Tab Navigator.
-                // If we are at the root of the tab (index.tsx), preventDefault? No, we want default behavior usually (focus).
-
-                // The user says "Khi người dùng nhấn vào Tab 'Khách sạn' (dù Tab đã được chọn hay chưa)".
-                // If I am ALREADY at index.tsx, not much to do.
-                // If I am NOT at index.tsx? 
-                // Wait, this code is IN `index.tsx`. `useFocusEffect` runs when `index.tsx` is focused.
-                // If `index.tsx` is focused, we are ALREADY at the root of the tab (usually).
-                // Unless there are other screens triggering this effect? No.
-
-                // Maybe the user means: Put this logic in the `_layout.tsx` of the `(tabs)`?
-                // OR, the component stays mounted?
-
-                // With Expo Router, if you push `/hotels/results`, `(tabs)/hotels/index` might still be mounted in the back stack.
-                // So this listener might be active?
-                // Let's assume the user knows their architecture triggers.
-
-                // Implementation:
-                console.log("Tab Pressed - Handling Reset if needed");
-                // router.dismissAll() is a good way to clear stack down to the first screen in the stack.
-                // or navigation.popToTop().
-                // But verify type safety.
-
-                // Using router.dismissAll() is safe in Expo Router to go back to root of current stack group.
-                // But wait, if we are in (tabs), and we navigated to /hotels/result (global), are we in the SAME stack?
-                // In Expo Router, `replace` to `/hotels` might be the cleanest force reset.
-
-                // However, 'tabPress' event argument `e` logic:
-                // e.preventDefault(); // Stop default toggle
-                // Do custom logic.
-
-                // Let's stick to the requested pattern:
-                // "navigation.popToTop()" if possible, or router checks.
-            });
-
-            return unsubscribe;
-        }, [navigation])
+            // Placeholder for any specific focus logic
+        }, [])
     );
 
     const handleSearch = () => {
         if (!city) {
-            Alert.alert("Thiếu thông tin", "Vui lòng nhập thành phố/địa điểm.");
+            Alert.alert("Thiếu thông tin", "Vui lòng chọn địa điểm.");
             return;
         }
 
@@ -116,6 +55,11 @@ const HotelSearchScreen = () => {
                 guestCount: guestCount.toString(),
             }
         });
+    };
+
+    const handleSelectLocation = (loc: string) => {
+        setCity(loc);
+        setShowLocations(false);
     };
 
     const onCheckInChange = (event: any, selectedDate?: Date) => {
@@ -136,7 +80,7 @@ const HotelSearchScreen = () => {
     };
 
     return (
-        <ScrollView style={styles.container} contentContainerStyle={{ paddingBottom: 40 }}>
+        <ScrollView style={styles.container} contentContainerStyle={{ paddingBottom: 40 }} keyboardShouldPersistTaps="handled">
             <Stack.Screen options={{
                 title: "Tìm Kiếm", headerLeft: () => null, headerTitleStyle: { fontWeight: 'bold' },
                 headerShadowVisible: false, headerStyle: { backgroundColor: Colors.background }
@@ -151,14 +95,35 @@ const HotelSearchScreen = () => {
 
             {/* Search Form Card */}
             <View style={styles.card}>
-                <CustomInput
-                    label="Địa điểm" iconName="location-outline" placeholder="Bạn muốn đi đâu?" value={city}
-                    onPress={() => { /* Mock location picker switch */
-                        setCity(city === 'Đà Nẵng' ? 'Hà Nội' : city === 'Hà Nội' ? 'TP.HCM' : 'Đà Nẵng')
-                    }}
-                />
 
-                <View style={{ marginTop: 15 }}>
+                {/* Location Input with Dropdown */}
+                <View style={{ zIndex: 10 }}>
+                    <CustomInput
+                        label="Địa điểm"
+                        iconName="location-outline"
+                        placeholder="Bạn muốn đi đâu?"
+                        value={city}
+                        onPress={() => setShowLocations(!showLocations)}
+                    />
+
+                    {showLocations && (
+                        <View style={styles.dropdownList}>
+                            {LOCATIONS.map((loc, index) => (
+                                <TouchableOpacity
+                                    key={index}
+                                    style={styles.dropdownItem}
+                                    onPress={() => handleSelectLocation(loc)}
+                                >
+                                    <Ionicons name="location-sharp" size={16} color={Colors.primary} style={{ marginRight: 8 }} />
+                                    <Text style={styles.dropdownText}>{loc}</Text>
+                                    {city === loc && <Ionicons name="checkmark" size={16} color={Colors.success} style={{ marginLeft: 'auto' }} />}
+                                </TouchableOpacity>
+                            ))}
+                        </View>
+                    )}
+                </View>
+
+                <View style={{ marginTop: 15, zIndex: 1 }}>
                     <Text style={[styles.inputLabel, { marginBottom: 8 }]}>Ngày nhận phòng</Text>
                     <TouchableOpacity style={styles.dateBox} onPress={() => setShowCheckInPicker(true)}>
                         <Ionicons name="calendar-outline" size={20} color={Colors.textSecondary} style={{ marginRight: 8 }} />
@@ -166,7 +131,7 @@ const HotelSearchScreen = () => {
                     </TouchableOpacity>
                 </View>
 
-                <View style={{ marginTop: 15 }}>
+                <View style={{ marginTop: 15, zIndex: 1 }}>
                     <Text style={[styles.inputLabel, { marginBottom: 8 }]}>Ngày trả phòng</Text>
                     <TouchableOpacity style={styles.dateBox} onPress={() => setShowCheckOutPicker(true)}>
                         <Ionicons name="calendar-outline" size={20} color={Colors.textSecondary} style={{ marginRight: 8 }} />
@@ -174,14 +139,22 @@ const HotelSearchScreen = () => {
                     </TouchableOpacity>
                 </View>
 
-                <View style={{ marginTop: 15 }}>
+                <View style={{ marginTop: 15, zIndex: 1 }}>
                     <Text style={[styles.inputLabel, { marginBottom: 8 }]}>Số khách</Text>
                     <View style={styles.guestCounter}>
                         <TouchableOpacity onPress={() => setGuestCount(Math.max(1, guestCount - 1))} style={styles.counterBtn}>
                             <Ionicons name="remove" size={20} color={Colors.text} />
                         </TouchableOpacity>
                         <Text style={styles.guestText}>{guestCount} Khách</Text>
-                        <TouchableOpacity onPress={() => setGuestCount(guestCount + 1)} style={styles.counterBtn}>
+                        <TouchableOpacity
+                            onPress={() => {
+                                if (guestCount >= 5) {
+                                    Alert.alert("Thông báo", "Tối đa chỉ được đặt cho 5 người khách.");
+                                } else {
+                                    setGuestCount(guestCount + 1);
+                                }
+                            }}
+                            style={styles.counterBtn}>
                             <Ionicons name="add" size={20} color={Colors.text} />
                         </TouchableOpacity>
                     </View>
@@ -245,6 +218,37 @@ const styles = StyleSheet.create({
     guestCounter: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', borderWidth: 1, borderColor: Colors.border, borderRadius: 10, padding: 5 },
     counterBtn: { padding: 10, backgroundColor: '#f0f0f0', borderRadius: 8 },
     guestText: { fontSize: 16, fontWeight: '600', color: Colors.text },
+
+    // Dropdown Styles
+    dropdownList: {
+        position: 'absolute',
+        top: 75, // Adjust based on input height
+        left: 0,
+        right: 0,
+        backgroundColor: 'white',
+        borderRadius: 12,
+        padding: 5,
+        borderWidth: 1,
+        borderColor: '#eee',
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.15,
+        shadowRadius: 10,
+        elevation: 10,
+        zIndex: 100,
+    },
+    dropdownItem: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        padding: 12,
+        borderBottomWidth: 1,
+        borderBottomColor: '#f5f5f5',
+    },
+    dropdownText: {
+        fontSize: 15,
+        color: Colors.text,
+        marginLeft: 4,
+    },
 
     // Modal
     modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'center', alignItems: 'center', padding: 20 },

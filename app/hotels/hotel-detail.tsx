@@ -1,12 +1,29 @@
-import React from 'react';
-import { StyleSheet, View, Text, ScrollView, Image, TouchableOpacity, FlatList } from 'react-native';
+import React, { useState } from 'react';
+import { StyleSheet, View, Text, ScrollView, Image, TouchableOpacity, Button, Dimensions, FlatList } from 'react-native';
 import { useLocalSearchParams, Stack, router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { Hotel, Room } from '@/hooks/useHotels';
 
+const { width } = Dimensions.get('window');
 const Colors = {
-    primary: '#5B37B7', text: '#333', textSecondary: '#666', background: '#F5F5F5',
-    white: '#FFFFFF', border: '#E0E0E0', price: '#FF5722', star: '#FFC107'
+    primary: '#5B37B7', text: '#333', textSecondary: '#666', background: '#F9F9F9',
+    white: '#FFFFFF', border: '#E0E0E0', price: '#FF5722', success: '#4CAF50',
+};
+
+const HOTEL_PLACEHOLDER = 'https://via.placeholder.com/400x300.png?text=No+Image';
+
+// Amenity Icon Mapper
+const getAmenityIcon = (amenity: string): keyof typeof Ionicons.glyphMap => {
+    const lower = amenity.toLowerCase();
+    if (lower.includes('wifi')) return 'wifi';
+    if (lower.includes('pool') || lower.includes('hồ bơi')) return 'water';
+    if (lower.includes('ba') || lower.includes('bar')) return 'beer';
+    if (lower.includes('gym')) return 'barbell';
+    if (lower.includes('spa')) return 'leaf';
+    if (lower.includes('parking') || lower.includes('xe')) return 'car';
+    if (lower.includes('ac') || lower.includes('lạnh')) return 'snow';
+    if (lower.includes('restaurant') || lower.includes('nhà hàng') || lower.includes('ăn')) return 'restaurant';
+    return 'checkmark-circle-outline';
 };
 
 const HotelDetailScreen = () => {
@@ -14,118 +31,132 @@ const HotelDetailScreen = () => {
         hotel: string; checkInDate: string; checkOutDate: string; guestCount: string; totalNights: string;
     }>();
 
-    const hotel: Hotel = params.hotel ? JSON.parse(params.hotel) : null;
-    const totalNights = parseInt(params.totalNights || '1');
+    const hotel: Hotel = JSON.parse(params.hotel);
+    const rooms = hotel.rooms || [];
+    const minPrice = rooms.length > 0 ? Math.min(...rooms.map(r => r.price)) : 0;
 
-    if (!hotel) {
-        return (
-            <View style={styles.centered}>
-                <Text>Không tìm thấy thông tin khách sạn.</Text>
-            </View>
-        );
-    }
+    const [activeImage, setActiveImage] = useState(0);
 
     const handleRoomSelect = (room: Room) => {
-        const totalPrice = room.price * totalNights;
         router.push({
-            pathname: '/hotels/detail',
+            pathname: '/hotels/detail', // Booking Screen
             params: {
-                hotelId: hotel.id,
                 hotelName: hotel.name,
-                roomId: room.id,
                 roomName: room.name,
-                pricePerNight: room.price.toString(),
-                totalPrice: totalPrice.toString(),
-                totalNights: params.totalNights,
+                roomPrice: room.price.toString(),
+                hotelImage: hotel.images[0], // Pass query image for summary
                 checkInDate: params.checkInDate,
                 checkOutDate: params.checkOutDate,
                 guestCount: params.guestCount,
+                totalNights: params.totalNights,
             }
         });
+    };
+
+    const renderRoomItem = (room: Room) => {
+        const roomImage = room.image || hotel.images[0]; // Fallback if room has no image
+        return (
+            <View style={styles.roomCard} key={room.id}>
+                <View style={styles.roomImageContainer}>
+                    <Image source={{ uri: roomImage }} style={styles.roomImage} resizeMode="cover" />
+                </View>
+                <View style={styles.roomInfo}>
+                    <Text style={styles.roomName}>{room.name}</Text>
+                    <View style={styles.roomMeta}>
+                        <Ionicons name="person-outline" size={14} color={Colors.textSecondary} />
+                        <Text style={styles.metaText}>Tối đa {room.maxGuests} khách</Text>
+                    </View>
+
+                    <View style={styles.roomPriceRow}>
+                        <View>
+                            <Text style={styles.pricePerNightText}>Giá 1 đêm</Text>
+                            <Text style={styles.roomPrice}>{new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(room.price)}</Text>
+                        </View>
+                        <TouchableOpacity style={styles.selectButton} onPress={() => handleRoomSelect(room)}>
+                            <Text style={styles.selectButtonText}>Chọn</Text>
+                        </TouchableOpacity>
+                    </View>
+                </View>
+            </View>
+        );
     };
 
     return (
         <ScrollView style={styles.container} bounces={false}>
             <Stack.Screen options={{
                 title: hotel.name,
-                headerBackTitle: '',
                 headerTransparent: true,
                 headerTintColor: '#fff',
                 headerBlurEffect: 'dark',
-                headerStyle: { backgroundColor: 'rgba(0,0,0,0.3)' }
+                headerTitleStyle: { color: 'rgba(0,0,0,0)' } // Hide title in header initially if wanted, or show
             }} />
 
-            {/* Image Gallery */}
-            <ScrollView horizontal pagingEnabled showsHorizontalScrollIndicator={false} style={styles.imageContainer}>
-                {hotel.images && hotel.images.length > 0 ? (
-                    hotel.images.map((img, index) => (
-                        <Image key={index} source={{ uri: img }} style={styles.hotelImage} resizeMode="cover" />
-                    ))
-                ) : (
-                    <View style={[styles.hotelImage, { backgroundColor: '#ddd', justifyContent: 'center', alignItems: 'center' }]}>
-                        <Ionicons name="image-outline" size={50} color="#888" />
-                    </View>
-                )}
-            </ScrollView>
+            {/* Image Slider */}
+            <View style={styles.sliderContainer}>
+                <ScrollView
+                    horizontal
+                    pagingEnabled
+                    showsHorizontalScrollIndicator={false}
+                    onScroll={({ nativeEvent }) => {
+                        const slide = Math.ceil(nativeEvent.contentOffset.x / nativeEvent.layoutMeasurement.width);
+                        setActiveImage(slide);
+                    }}
+                    scrollEventThrottle={16}
+                >
+                    {(hotel.images || [HOTEL_PLACEHOLDER]).map((img, index) => (
+                        <Image key={index} source={{ uri: img }} style={styles.sliderImage} resizeMode="cover" />
+                    ))}
+                </ScrollView>
+                <View style={styles.pagination}>
+                    <Text style={styles.paginationText}>{activeImage + 1} / {(hotel.images || []).length > 0 ? hotel.images.length : 1}</Text>
+                </View>
 
+                {/* Back Button Gradient Overlay for visibility - managed by header normally, but if transparent */}
+                <View style={styles.headerGradient} />
+            </View>
+
+            {/* Content */}
             <View style={styles.contentContainer}>
-                {/* Header Info */}
-                <Text style={styles.name}>{hotel.name}</Text>
+                <Text style={styles.hotelName}>{hotel.name}</Text>
 
                 <View style={styles.ratingRow}>
-                    <Ionicons name="star" size={18} color={Colors.star} />
-                    <Text style={styles.ratingText}>{hotel.rating} / 5</Text>
-                    <Text style={styles.ratingLabel}>(Tuyệt vời)</Text>
-                </View>
-
-                <View style={styles.locationContainer}>
-                    <Ionicons name="location" size={18} color={Colors.primary} />
-                    <Text style={styles.address}>{hotel.address}</Text>
-                </View>
-
-                {/* Amenities */}
-                {hotel.amenities && hotel.amenities.length > 0 && (
-                    <View style={styles.section}>
-                        <Text style={styles.sectionTitle}>Tiện nghi</Text>
-                        <View style={styles.amenitiesGrid}>
-                            {hotel.amenities.map((amenity, idx) => (
-                                <View key={idx} style={styles.amenityItem}>
-                                    <Ionicons name="checkmark-circle-outline" size={16} color={Colors.primary} />
-                                    <Text style={styles.amenityText}>{amenity}</Text>
-                                </View>
-                            ))}
-                        </View>
+                    <View style={styles.badge}>
+                        <Text style={styles.badgeText}>{hotel.rating}</Text>
                     </View>
-                )}
+                    <Text style={styles.ratingLabel}>Xuất sắc</Text>
+                </View>
+
+                <View style={styles.locationRow}>
+                    <Ionicons name="location" size={16} color={Colors.primary} />
+                    <Text style={styles.addressText}>{hotel.address}</Text>
+                </View>
 
                 <View style={styles.divider} />
 
-                {/* Rooms List */}
+                <Text style={styles.sectionTitle}>Tiện nghi</Text>
+                <View style={styles.amenitiesGrid}>
+                    {(hotel.amenities || []).map((amenity, index) => (
+                        <View key={index} style={styles.amenityItem}>
+                            <Ionicons name={getAmenityIcon(amenity)} size={20} color={Colors.textSecondary} />
+                            <Text style={styles.amenityText}>{amenity}</Text>
+                        </View>
+                    ))}
+                </View>
+
+                <View style={styles.divider} />
+
                 <Text style={styles.sectionTitle}>Chọn phòng</Text>
-                <Text style={styles.nightsLabel}>Giá cho {totalNights} đêm</Text>
-
-                {hotel.rooms?.map(room => (
-                    <View key={room.id} style={styles.roomCard}>
-                        <View style={styles.roomHeader}>
-                            <Text style={styles.roomName}>{room.name}</Text>
-                            <Ionicons name="people-outline" size={20} color={Colors.textSecondary} />
-                        </View>
-
-                        <View style={styles.roomDetails}>
-                            <Text style={styles.guestText}>Tối đa {room.maxGuests} người lớn</Text>
-
-                            <View style={styles.priceContainer}>
-                                <Text style={styles.totalPrice}>{(room.price * totalNights).toLocaleString('vi-VN')} ₫</Text>
-                                <Text style={styles.perNightText}>{room.price.toLocaleString('vi-VN')} ₫/đêm</Text>
-                            </View>
-
-                            <TouchableOpacity style={styles.bookButton} onPress={() => handleRoomSelect(room)}>
-                                <Text style={styles.bookButtonText}>Đặt phòng này</Text>
-                            </TouchableOpacity>
-                        </View>
+                {rooms.length > 0 ? (
+                    rooms.map(room => renderRoomItem(room))
+                ) : (
+                    <View style={styles.emptyRooms}>
+                        <Text>Hiện chưa có thông tin phòng cho khách sạn này.</Text>
                     </View>
-                ))}
+                )}
+
             </View>
+
+            <View style={{ height: 40 }} />
         </ScrollView>
     );
 };
@@ -134,39 +165,44 @@ export default HotelDetailScreen;
 
 const styles = StyleSheet.create({
     container: { flex: 1, backgroundColor: Colors.background },
-    centered: { flex: 1, justifyContent: 'center', alignItems: 'center' },
-    imageContainer: { height: 250, width: '100%' },
-    hotelImage: { width: 400, height: 250 }, // Fixed width simplistic for paging or use Dimensions
+    sliderContainer: { height: 300, position: 'relative' },
+    sliderImage: { width: width, height: 300 },
+    pagination: { position: 'absolute', bottom: 15, right: 15, backgroundColor: 'rgba(0,0,0,0.6)', paddingHorizontal: 10, paddingVertical: 4, borderRadius: 12 },
+    paginationText: { color: 'white', fontSize: 12, fontWeight: 'bold' },
+    headerGradient: { position: 'absolute', top: 0, left: 0, right: 0, height: 80, backgroundColor: 'rgba(0,0,0,0.3)' }, // Simulate gradient
 
-    contentContainer: { flex: 1, backgroundColor: Colors.white, marginTop: -20, borderTopLeftRadius: 24, borderTopRightRadius: 24, padding: 20 },
-    name: { fontSize: 24, fontWeight: 'bold', color: Colors.text, marginBottom: 8 },
+    contentContainer: { flex: 1, backgroundColor: Colors.background, borderTopLeftRadius: 24, borderTopRightRadius: 24, marginTop: -20, padding: 20 },
+    hotelName: { fontSize: 22, fontWeight: 'bold', color: Colors.text, marginBottom: 10 },
+
     ratingRow: { flexDirection: 'row', alignItems: 'center', marginBottom: 12 },
-    ratingText: { fontSize: 16, fontWeight: 'bold', marginLeft: 5, color: Colors.text },
-    ratingLabel: { fontSize: 14, color: Colors.textSecondary, marginLeft: 5 },
+    badge: { backgroundColor: Colors.primary, paddingHorizontal: 8, paddingVertical: 4, borderRadius: 6, marginRight: 8 },
+    badgeText: { color: 'white', fontWeight: 'bold' },
+    ratingLabel: { fontSize: 14, fontWeight: '600', color: Colors.primary },
 
-    locationContainer: { flexDirection: 'row', marginBottom: 20 },
-    address: { marginLeft: 8, color: Colors.textSecondary, flex: 1, lineHeight: 20 },
+    locationRow: { flexDirection: 'row', alignItems: 'flex-start', marginBottom: 15 },
+    addressText: { flex: 1, marginLeft: 6, color: Colors.textSecondary, lineHeight: 20 },
 
-    section: { marginBottom: 20 },
-    sectionTitle: { fontSize: 18, fontWeight: 'bold', color: Colors.text, marginBottom: 10 },
     divider: { height: 1, backgroundColor: '#EEE', marginVertical: 20 },
+    sectionTitle: { fontSize: 18, fontWeight: 'bold', color: Colors.text, marginBottom: 15 },
 
-    amenitiesGrid: { flexDirection: 'row', flexWrap: 'wrap' },
-    amenityItem: { flexDirection: 'row', alignItems: 'center', width: '50%', marginBottom: 8 },
-    amenityText: { marginLeft: 6, color: Colors.textSecondary },
+    amenitiesGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 15 },
+    amenityItem: { flexDirection: 'row', alignItems: 'center', width: '45%', gap: 8 },
+    amenityText: { color: Colors.textSecondary, fontSize: 14 },
 
-    nightsLabel: { color: Colors.textSecondary, marginBottom: 15 },
+    // Room Card
+    roomCard: { backgroundColor: 'white', borderRadius: 12, marginBottom: 15, overflow: 'hidden', borderWidth: 1, borderColor: '#eee' },
+    roomImageContainer: { height: 150, width: '100%' },
+    roomImage: { width: '100%', height: '100%' },
+    roomInfo: { padding: 15 },
+    roomName: { fontSize: 16, fontWeight: 'bold', marginBottom: 5 },
+    roomMeta: { flexDirection: 'row', alignItems: 'center', marginBottom: 10, gap: 5 },
+    metaText: { color: Colors.textSecondary, fontSize: 13 },
 
-    roomCard: { backgroundColor: Colors.white, borderRadius: 12, borderWidth: 1, borderColor: Colors.border, marginBottom: 15, padding: 15 },
-    roomHeader: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 10 },
-    roomName: { fontSize: 16, fontWeight: 'bold', color: Colors.text },
-    roomDetails: {},
-    guestText: { color: Colors.textSecondary, marginBottom: 10 },
+    roomPriceRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: 5 },
+    pricePerNightText: { fontSize: 12, color: Colors.textSecondary },
+    roomPrice: { fontSize: 18, fontWeight: 'bold', color: Colors.price },
+    selectButton: { backgroundColor: Colors.primary, paddingHorizontal: 20, paddingVertical: 10, borderRadius: 8 },
+    selectButtonText: { color: 'white', fontWeight: 'bold' },
 
-    priceContainer: { marginBottom: 10 },
-    totalPrice: { fontSize: 20, fontWeight: 'bold', color: Colors.price },
-    perNightText: { fontSize: 13, color: Colors.textSecondary },
-
-    bookButton: { backgroundColor: Colors.primary, paddingVertical: 12, borderRadius: 10, alignItems: 'center' },
-    bookButtonText: { color: Colors.white, fontWeight: 'bold', fontSize: 16 },
+    emptyRooms: { padding: 20, alignItems: 'center', backgroundColor: '#f0f0f0', borderRadius: 10 }
 });

@@ -4,7 +4,7 @@ import { Alert, KeyboardAvoidingView, Platform, Pressable, ScrollView, TextInput
 import { useRouter } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
 import { signInWithEmailAndPassword } from "firebase/auth";
-import { auth } from "../../configs/firebaseConfig";
+import { auth } from "@/services/firebaseConfig";
 import { authStyles } from "./styles";
 
 export default function LoginScreen() {

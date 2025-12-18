@@ -12,6 +12,7 @@ const Colors = {
 
 const HotelBookingDetailScreen = () => {
     const params = useLocalSearchParams<{
+        hotelId: string; roomId: string;
         hotelName: string; roomName: string; roomPrice: string;
         hotelImage: string; checkInDate: string; checkOutDate: string;
         guestCount: string; totalNights: string;
@@ -39,9 +40,9 @@ const HotelBookingDetailScreen = () => {
 
         try {
             await createBooking({
-                hotelId: 'temp_id', // Ideally pass real ID
+                hotelId: params.hotelId as string,
                 hotelName: params.hotelName,
-                roomId: 'temp_room_id', // Ideally pass real ID
+                roomId: params.roomId as string,
                 roomName: params.roomName,
                 checkInDate: params.checkInDate,
                 checkOutDate: params.checkOutDate,

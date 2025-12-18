@@ -5,7 +5,7 @@ import { useRouter } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
 import { createUserWithEmailAndPassword } from "firebase/auth";
 import { doc, setDoc } from "firebase/firestore"; // Import thêm để lưu data
-import { auth, db } from "../../configs/firebaseConfig"; // Import db từ config
+import { auth, db } from "@/services/firebaseConfig"; // Import db từ config
 import { authStyles } from "./styles";
 
 export default function RegisterScreen() {

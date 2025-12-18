@@ -41,6 +41,8 @@ const HotelDetailScreen = () => {
         router.push({
             pathname: '/hotels/detail', // Booking Screen
             params: {
+                hotelId: hotel.id,
+                roomId: room.id,
                 hotelName: hotel.name,
                 roomName: room.name,
                 roomPrice: room.price.toString(),

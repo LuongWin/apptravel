@@ -1,6 +1,6 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import { db } from '@/services/firebaseConfig';
-import { collection, query, where, getDocs } from 'firebase/firestore';
+import { collection, query, getDocs, where } from 'firebase/firestore';
 
 export interface Room {
     id: string;
@@ -8,12 +8,14 @@ export interface Room {
     name: string;
     price: number;
     maxGuests: number;
+    image?: string; // Added image support for rooms
 }
 
 export interface Hotel {
     id: string;
     name: string;
     address: string;
+    location?: string; // Added location field
     rating: number;
     images: string[];
     amenities: string[];
@@ -22,75 +24,89 @@ export interface Hotel {
 
 export const useHotels = () => {
     const [hotels, setHotels] = useState<Hotel[]>([]);
+    const [allHotels, setAllHotels] = useState<Hotel[]>([]); // Cache all hotels
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
 
-    const searchHotels = useCallback(async (city: string) => {
+    // Initial fetch of ALL data (Hotels + Rooms)
+    const fetchAllData = useCallback(async () => {
         setLoading(true);
         setError(null);
-        setHotels([]);
-
         try {
-            console.log("Searching hotels in:", city);
+            console.log("Fetching all HOTELS and ROOMS...");
 
-            // 1. Fetch Hotels in the city
-            // Note: This assumes a simple string match or you might need a more complex query setup
+            // 1. Fetch ALL Hotels
             const hotelsRef = collection(db, 'HOTELS');
-            // Basic query: checks if address field >= city and < city + \uf8ff (prefix match)
-            // Or simpler for now: Fetch all and filter client-side if dataset is small, 
-            // BUT for production/firebase best practice, we should use 'where'.
-            // For now, let's assume 'address' field contains the city name. 
-            // Firestore doesn't support 'contains' natively easily. 
-            // We will fetch all hotels (assuming small dataset) and filter or use a specific 'city' field if it existed.
-            // Let's use a workaround: Fetch all for this demo or assume 'city' field exists.
-            // Given the sample data has 'address', let's fetch matching address (inefficient but works for small demo)
+            const hotelSnapshot = await getDocs(hotelsRef);
+            const rawHotels = hotelSnapshot.docs.map(doc => ({
+                id: doc.id,
+                ...doc.data()
+            } as Hotel));
 
-            // BETTER APPROACH: Add a 'city' keyword field to your data. 
-            // For this task, I will fetch all and filter client-side to ensure it works with the sample data provided.
+            // 2. Fetch ALL Rooms (Optimization: Fetch all once instead of N queries)
+            // Note: If dataset is huge, this is bad. For this app scope, it's efficient.
+            const roomsRef = collection(db, 'ROOMS');
+            const roomsSnapshot = await getDocs(roomsRef);
+            const allRooms = roomsSnapshot.docs.map(doc => ({
+                id: doc.id,
+                ...doc.data()
+            } as Room));
 
-            const hotelQuery = query(collection(db, 'HOTELS'));
-            const hotelSnapshot = await getDocs(hotelQuery);
+            // 3. Map Rooms to Hotels
+            const mappedHotels = rawHotels.map(hotel => ({
+                ...hotel,
+                rooms: allRooms.filter(room => room.hotelId === hotel.id)
+            }));
 
-            const matchedHotels: Hotel[] = [];
-
-            for (const doc of hotelSnapshot.docs) {
-                const hotelData = doc.data() as Omit<Hotel, 'id'>;
-                // Simple case-insensitive check
-                // Expanded logic: If city is empty, treat as match all? Or just strictly check includes.
-                // Fixed: Ensure we check includes safely.
-                const addressUpper = hotelData.address ? hotelData.address.toUpperCase() : '';
-                const cityUpper = city.toUpperCase();
-
-                if (addressUpper.includes(cityUpper) || cityUpper === '') {
-
-                    // 2. Fetch Rooms for this hotel
-                    const roomsQuery = query(collection(db, 'ROOMS'), where('hotelId', '==', doc.id));
-                    const roomsSnapshot = await getDocs(roomsQuery);
-                    const rooms: Room[] = roomsSnapshot.docs.map(rDoc => ({
-                        id: rDoc.id,
-                        ...rDoc.data()
-                    } as Room));
-
-                    if (rooms.length > 0) {
-                        matchedHotels.push({
-                            id: doc.id,
-                            ...hotelData,
-                            rooms: rooms
-                        });
-                    }
-                }
-            }
-
-            console.log(`Found ${matchedHotels.length} hotels matching '${city}'`);
-            setHotels(matchedHotels);
+            setAllHotels(mappedHotels);
+            setHotels(mappedHotels); // Default show all
+            console.log(`Loaded ${mappedHotels.length} hotels and ${allRooms.length} rooms.`);
 
         } catch (err: any) {
-            console.error("Error searching hotels:", err);
-            setError(err.message || "Không thể tải danh sách khách sạn.");
+            console.error("Error fetching hotel data:", err);
+            setError(err.message || "Không thể tải dữ liệu khách sạn.");
         } finally {
             setLoading(false);
         }
     }, []);
 
-    return { hotels, loading, error, searchHotels };
+    // Initial load
+    useEffect(() => {
+        fetchAllData();
+    }, [fetchAllData]);
+
+    const searchHotels = useCallback((keyword: string) => {
+        if (!keyword.trim()) {
+            setHotels(allHotels);
+            return;
+        }
+
+        const lowerKeyword = keyword.toLowerCase().trim();
+        let searchTerms = [lowerKeyword];
+
+        // Handle specific location aliases
+        if (lowerKeyword === 'tp.hcm' || lowerKeyword === 'tphcm') {
+            searchTerms.push('hồ chí minh');
+            searchTerms.push('ho chi minh');
+            searchTerms.push('TP. Hồ Chí Minh'); // With space
+            searchTerms.push('TP.HCM');
+        }
+
+        const filtered = allHotels.filter(hotel => {
+            const nameLower = hotel.name.toLowerCase();
+            const addressLower = hotel.address.toLowerCase();
+            const locationLower = hotel.location ? hotel.location.toLowerCase() : '';
+
+            return searchTerms.some(term =>
+                nameLower.includes(term) ||
+                addressLower.includes(term) ||
+                locationLower.includes(term)
+            );
+        });
+
+        console.log(`Search '${keyword}' found ${filtered.length} matches.`);
+        setHotels(filtered);
+    }, [allHotels]);
+
+    return { hotels, loading, error, searchHotels, refresh: fetchAllData };
 };

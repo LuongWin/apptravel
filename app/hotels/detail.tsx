@@ -1,163 +1,162 @@
-import React, { useState, useEffect } from 'react';
-import { StyleSheet, View, Text, ScrollView, TextInput, TouchableOpacity, Alert, KeyboardAvoidingView, Platform, ActivityIndicator } from 'react-native';
+import React, { useState } from 'react';
+import { StyleSheet, View, Text, ScrollView, TextInput, TouchableOpacity, Alert, ActivityIndicator, Image } from 'react-native';
 import { useLocalSearchParams, Stack, router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useHotelBookings } from '@/hooks/useHotelBookings';
-import { auth } from '@/services/firebaseConfig';
 import { format } from 'date-fns';
 
 const Colors = {
-    primary: '#5B37B7', text: '#333', textSecondary: '#666', background: '#F5F5F5',
-    white: '#FFFFFF', border: '#DDDDDD', price: '#d32f2f',
-    inputBg: '#FAFAFA'
+    primary: '#5B37B7', text: '#333', textSecondary: '#666', background: '#F9F9F9',
+    white: '#FFFFFF', border: '#E0E0E0', price: '#FF5722', success: '#4CAF50',
 };
 
-const HotelDetailScreen = () => {
-    // Receive params as simple strings and parse them
+const HotelBookingDetailScreen = () => {
     const params = useLocalSearchParams<{
-        hotelId: string; hotelName: string; roomId: string; roomName: string;
-        pricePerNight: string; totalPrice: string; totalNights: string;
-        checkInDate: string; checkOutDate: string; guestCount: string;
+        hotelName: string; roomName: string; roomPrice: string;
+        hotelImage: string; checkInDate: string; checkOutDate: string;
+        guestCount: string; totalNights: string;
     }>();
 
     const { createBooking, loading } = useHotelBookings();
 
-    const [contactInfo, setContactInfo] = useState({
-        firstName: '', lastName: '', email: '', phoneNumber: ''
-    });
+    const [firstName, setFirstName] = useState('');
+    const [lastName, setLastName] = useState('');
+    const [email, setEmail] = useState('');
+    const [phone, setPhone] = useState('');
 
-    useEffect(() => {
-        const user = auth.currentUser;
-        if (user) {
-            setContactInfo(prev => ({
-                ...prev,
-                email: user.email || '',
-                firstName: user.displayName?.split(' ').pop() || '',
-                lastName: user.displayName?.split(' ').slice(0, -1).join(' ') || '',
-            }));
-        }
-    }, []);
+    const pricePerNight = parseInt(params.roomPrice || '0');
+    const nights = parseInt(params.totalNights || '1');
+    const totalPrice = pricePerNight * nights;
+
+    const formattedCheckIn = format(new Date(params.checkInDate), 'dd/MM/yyyy');
+    const formattedCheckOut = format(new Date(params.checkOutDate), 'dd/MM/yyyy');
 
     const handleConfirmBooking = async () => {
-        if (!contactInfo.firstName || !contactInfo.lastName || !contactInfo.email || !contactInfo.phoneNumber) {
-            Alert.alert("Thiếu thông tin", "Vui lòng nhập đầy đủ thông tin liên hệ.");
+        if (!firstName || !lastName || !email || !phone) {
+            Alert.alert("Thiếu thông tin", "Vui lòng điền đầy đủ thông tin khách hàng.");
             return;
         }
 
         try {
             await createBooking({
-                hotelId: params.hotelId,
+                hotelId: 'temp_id', // Ideally pass real ID
                 hotelName: params.hotelName,
-                roomId: params.roomId,
+                roomId: 'temp_room_id', // Ideally pass real ID
                 roomName: params.roomName,
                 checkInDate: params.checkInDate,
                 checkOutDate: params.checkOutDate,
-                totalNights: parseInt(params.totalNights),
-                totalPrice: parseInt(params.totalPrice),
+                totalNights: nights,
+                totalPrice: totalPrice,
+                contactInfo: { firstName, lastName, email, phoneNumber: phone },
                 guestCount: parseInt(params.guestCount),
-                contactInfo: contactInfo
             });
 
             Alert.alert("Thành công", "Đặt phòng thành công!", [
                 { text: "Về trang chủ", onPress: () => router.dismissAll() }
             ]);
-        } catch (e) {
-            // Already handled in hook
+        } catch (error: any) {
+            Alert.alert("Lỗi", error.message || "Có lỗi xảy ra.");
         }
     };
 
     return (
-        <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={{ flex: 1 }}>
-            <Stack.Screen options={{ title: 'Xác nhận đặt phòng', headerBackTitle: '' }} />
+        <ScrollView style={styles.container}>
+            <Stack.Screen options={{ title: "Xác nhận đặt phòng", headerTitleStyle: { fontWeight: 'bold' } }} />
 
-            <ScrollView style={styles.container} contentContainerStyle={{ paddingBottom: 100 }}>
-
-                {/* Summary Card */}
-                <View style={styles.card}>
-                    <Text style={styles.hotelName}>{params.hotelName}</Text>
-                    <Text style={styles.roomName}>{params.roomName}</Text>
-
-                    <View style={styles.divider} />
-
-                    <View style={styles.row}>
-                        <View>
-                            <Text style={styles.label}>Nhận phòng</Text>
-                            <Text style={styles.val}>{format(new Date(params.checkInDate), 'dd/MM/yyyy')}</Text>
-                        </View>
-                        <Ionicons name="arrow-forward" size={20} color={Colors.textSecondary} />
-                        <View>
-                            <Text style={[styles.label, { textAlign: 'right' }]}>Trả phòng</Text>
-                            <Text style={styles.val}>{format(new Date(params.checkOutDate), 'dd/MM/yyyy')}</Text>
+            {/* Hotel Summary */}
+            <View style={styles.card}>
+                <View style={styles.hotelRow}>
+                    <Image source={{ uri: params.hotelImage }} style={styles.hotelThumb} />
+                    <View style={styles.hotelInfo}>
+                        <Text style={styles.hotelName}>{params.hotelName}</Text>
+                        <Text style={styles.roomName}>{params.roomName}</Text>
+                        <View style={styles.dateRow}>
+                            <Ionicons name="calendar-outline" size={14} color={Colors.textSecondary} />
+                            <Text style={styles.dateText}>{formattedCheckIn} - {formattedCheckOut} ({nights} đêm)</Text>
                         </View>
                     </View>
-
-                    <Text style={styles.nightsInfo}>{params.totalNights} đêm • {params.guestCount} khách</Text>
                 </View>
 
-                {/* Contact Info */}
-                <View style={styles.card}>
-                    <Text style={styles.cardTitle}>Thông tin liên hệ</Text>
-                    <Text style={styles.required}>* Tất cả trường là bắt buộc</Text>
+                <View style={styles.divider} />
 
-                    <TextInput
-                        style={styles.input} placeholder="Họ *"
-                        value={contactInfo.lastName} onChangeText={t => setContactInfo({ ...contactInfo, lastName: t })}
-                    />
-                    <TextInput
-                        style={styles.input} placeholder="Tên *"
-                        value={contactInfo.firstName} onChangeText={t => setContactInfo({ ...contactInfo, firstName: t })}
-                    />
-                    <TextInput
-                        style={styles.input} placeholder="Email *" keyboardType="email-address"
-                        value={contactInfo.email} onChangeText={t => setContactInfo({ ...contactInfo, email: t })}
-                    />
-                    <TextInput
-                        style={styles.input} placeholder="Số điện thoại *" keyboardType="phone-pad"
-                        value={contactInfo.phoneNumber} onChangeText={t => setContactInfo({ ...contactInfo, phoneNumber: t })}
-                    />
+                <View style={styles.priceRow}>
+                    <Text style={styles.priceLabel}>Tổng tiền ({nights} đêm):</Text>
+                    <Text style={styles.totalPrice}>{new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(totalPrice)}</Text>
                 </View>
-
-            </ScrollView>
-
-            {/* Bottom Bar */}
-            <View style={styles.bottomBar}>
-                <View>
-                    <Text style={styles.totalLabel}>Tổng tiền ({params.totalNights} đêm)</Text>
-                    <Text style={styles.totalPrice}>{parseInt(params.totalPrice).toLocaleString('vi-VN')} ₫</Text>
-                </View>
-                <TouchableOpacity
-                    style={[styles.bookBtn, loading && { opacity: 0.7 }]}
-                    onPress={handleConfirmBooking}
-                    disabled={loading}
-                >
-                    {loading ? <ActivityIndicator color="#fff" /> : <Text style={styles.bookBtnText}>Thanh toán</Text>}
-                </TouchableOpacity>
             </View>
 
-        </KeyboardAvoidingView>
+            {/* Guest Form */}
+            <View style={styles.section}>
+                <Text style={styles.sectionTitle}>Thông tin khách hàng</Text>
+
+                <View style={styles.inputGroup}>
+                    <Text style={styles.label}>Họ (ví dụ: Nguyen)</Text>
+                    <TextInput style={styles.input} value={lastName} onChangeText={setLastName} placeholder="Nhập họ" />
+                </View>
+
+                <View style={styles.inputGroup}>
+                    <Text style={styles.label}>Tên đệm & Tên (ví dụ: Van A)</Text>
+                    <TextInput style={styles.input} value={firstName} onChangeText={setFirstName} placeholder="Nhập tên" />
+                </View>
+
+                <View style={styles.inputGroup}>
+                    <Text style={styles.label}>Số điện thoại</Text>
+                    <TextInput style={styles.input} value={phone} onChangeText={setPhone} keyboardType="phone-pad" placeholder="09xxxxxxx" />
+                </View>
+
+                <View style={styles.inputGroup}>
+                    <Text style={styles.label}>Email</Text>
+                    <TextInput style={styles.input} value={email} onChangeText={setEmail} keyboardType="email-address" placeholder="email@example.com" autoCapitalize="none" />
+                </View>
+            </View>
+
+            <View style={{ height: 20 }} />
+
+            {/* Submit Button */}
+            <TouchableOpacity
+                style={[styles.submitButton, loading && { opacity: 0.7 }]}
+                onPress={handleConfirmBooking}
+                disabled={loading}
+            >
+                {loading ? (
+                    <ActivityIndicator color="white" />
+                ) : (
+                    <Text style={styles.submitButtonText}>Thanh toán & Đặt phòng</Text>
+                )}
+            </TouchableOpacity>
+
+            <View style={{ height: 40 }} />
+        </ScrollView>
     );
 };
 
-export default HotelDetailScreen;
+export default HotelBookingDetailScreen;
 
 const styles = StyleSheet.create({
     container: { flex: 1, backgroundColor: Colors.background, padding: 15 },
-    card: { backgroundColor: Colors.white, borderRadius: 12, padding: 15, marginBottom: 15, shadowOpacity: 0.05, elevation: 2 },
-    hotelName: { fontSize: 18, fontWeight: 'bold', color: Colors.text },
-    roomName: { fontSize: 16, color: Colors.textSecondary, marginBottom: 10 },
-    divider: { height: 1, backgroundColor: '#eee', marginVertical: 10 },
-    row: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 },
-    label: { fontSize: 12, color: Colors.textSecondary },
-    val: { fontSize: 15, fontWeight: '600', color: Colors.text },
-    nightsInfo: { marginTop: 5, color: Colors.primary, fontWeight: '600' },
+    card: { backgroundColor: 'white', borderRadius: 12, padding: 15, marginBottom: 20, shadowColor: '#000', shadowOpacity: 0.05, shadowRadius: 5, elevation: 2 },
 
-    cardTitle: { fontSize: 16, fontWeight: 'bold', marginBottom: 5 },
-    required: { fontSize: 12, color: Colors.price, marginBottom: 15 },
-    input: { borderWidth: 1, borderColor: Colors.border, borderRadius: 8, padding: 12, marginBottom: 10, backgroundColor: Colors.inputBg },
+    hotelRow: { flexDirection: 'row', alignItems: 'center' },
+    hotelThumb: { width: 80, height: 80, borderRadius: 8, backgroundColor: '#eee' },
+    hotelInfo: { marginLeft: 15, flex: 1 },
+    hotelName: { fontSize: 16, fontWeight: 'bold', color: Colors.text, marginBottom: 4 },
+    roomName: { fontSize: 14, color: Colors.textSecondary, marginBottom: 4 },
+    dateRow: { flexDirection: 'row', alignItems: 'center', gap: 5 },
+    dateText: { fontSize: 13, color: Colors.textSecondary },
 
-    bottomBar: { position: 'absolute', bottom: 0, left: 0, right: 0, backgroundColor: Colors.white, padding: 15, paddingBottom: 30, borderTopWidth: 1, borderTopColor: '#eee', flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
-    totalLabel: { fontSize: 12, color: Colors.textSecondary },
-    totalPrice: { fontSize: 20, fontWeight: 'bold', color: Colors.price },
-    bookBtn: { backgroundColor: Colors.primary, paddingVertical: 12, paddingHorizontal: 30, borderRadius: 25 },
-    bookBtnText: { color: Colors.white, fontWeight: 'bold', fontSize: 16 },
+    divider: { height: 1, backgroundColor: '#f0f0f0', marginVertical: 15 },
+
+    priceRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+    priceLabel: { fontSize: 15, fontWeight: '600', color: Colors.text },
+    totalPrice: { fontSize: 18, fontWeight: 'bold', color: Colors.price },
+
+    section: { marginBottom: 20 },
+    sectionTitle: { fontSize: 16, fontWeight: 'bold', marginBottom: 15, color: Colors.text },
+
+    inputGroup: { marginBottom: 15 },
+    label: { fontSize: 13, color: Colors.textSecondary, marginBottom: 6 },
+    input: { backgroundColor: 'white', borderWidth: 1, borderColor: Colors.border, borderRadius: 8, padding: 12, fontSize: 15 },
+
+    submitButton: { backgroundColor: Colors.primary, paddingVertical: 15, borderRadius: 12, alignItems: 'center', shadowColor: Colors.primary, shadowOpacity: 0.3, shadowRadius: 5, elevation: 4 },
+    submitButtonText: { color: 'white', fontSize: 16, fontWeight: 'bold' }
 });

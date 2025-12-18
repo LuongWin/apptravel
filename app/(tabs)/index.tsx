@@ -206,7 +206,11 @@ export default function Dashboard() {
                     <Text style={styles.cardTitle} numberOfLines={1}>
                       {item.name}
                     </Text>
-                    <Text style={styles.cardPrice}>{formatCurrency(item.rooms?.[0]?.price || 0)}</Text>
+                    <Text style={styles.cardPrice}>
+                      {item.rooms?.length
+                        ? formatCurrency(Math.min(...item.rooms.map((r: any) => r.price)))
+                        : "Đang cập nhật"}
+                    </Text>
                     <View style={styles.locationRow}>
                       <Ionicons name="location-outline" size={14} color="#666" />
                       <Text style={styles.locationText} numberOfLines={1}>{item.address}</Text>

@@ -1,19 +1,20 @@
 import React, { useEffect, useState, useCallback } from 'react';
-import { StyleSheet, View, Text, ActivityIndicator, FlatList, Alert } from 'react-native';
+import { StyleSheet, View, Text, ActivityIndicator, FlatList, Alert, StatusBar } from 'react-native';
 import { useLocalSearchParams, Stack, router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useFlights, Flight } from '@/hooks/useFlights';
 import { format } from 'date-fns';
 import { vi } from 'date-fns/locale';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 // Import FlightCard (Assuming it exists and exports default)
 import FlightCard from '@/components/FlightCard';
 
 // --- Constants ---
 const Colors = {
-    primary: '#5B37B7', text: '#333', textSecondary: '#666', background: '#F9F9F9',
-    white: '#FFFFFF', border: '#E0E0E0', price: '#4F46E5',
-    success: '#4CAF50',
+    primary: '#0194F3', text: '#333', textSecondary: '#666', background: '#F9F9F9',
+    white: '#FFFFFF', border: '#E0E0E0', price: '#FF5E1F',
+    success: '#28a745',
 };
 
 // --- Helper: Get City Name ---
@@ -26,6 +27,7 @@ const getCityName = (code: string) => {
 
 // --- Screen: Flight Results ---
 const FlightResultsScreen = () => {
+    const insets = useSafeAreaInsets();
     // 1. Receive params
     const params = useLocalSearchParams<{
         from: string; to: string; departDate: string; isRoundTrip: string; returnDate?: string;
@@ -110,39 +112,47 @@ const FlightResultsScreen = () => {
 
     // --- Render Helpers ---
 
+    // Custom Header
+    const renderHeader = () => (
+        <View style={{ paddingTop: insets.top, backgroundColor: Colors.primary, paddingBottom: 15, borderBottomLeftRadius: 20, borderBottomRightRadius: 20 }}>
+            <StatusBar barStyle="light-content" backgroundColor={Colors.primary} />
+            <Stack.Screen options={{ headerShown: false }} />
+
+            <View style={styles.headerContent}>
+                <View style={styles.row}>
+                    <Ionicons name="arrow-back" size={24} color="white" onPress={() => router.back()} style={{ marginRight: 15 }} />
+                    <View>
+                        <Text style={styles.headerTitle}>{isSearchingReturn ? "Chọn Chiều Về" : "Chọn Chiều Đi"}</Text>
+                        <View style={styles.routeContainer}>
+                            <Ionicons name={isSearchingReturn ? "airplane-outline" : "airplane"} size={16} color="white" style={{ transform: [{ scaleX: isSearchingReturn ? -1 : 1 }], marginRight: 6 }} />
+                            <Text style={styles.headerSubtitle}>
+                                {currentRouteText} • {currentSearchDateString}
+                            </Text>
+                        </View>
+                    </View>
+                </View>
+            </View>
+        </View>
+    );
+
+
     if (loading) {
         return (
-            <View style={styles.centered}>
-                <ActivityIndicator size="large" color={Colors.primary} />
-                <Text style={{ marginTop: 10, color: Colors.textSecondary }}>
-                    {isSearchingReturn ? "Đang tìm chuyến về..." : "Đang tìm chuyến đi..."}
-                </Text>
+            <View style={{ flex: 1, backgroundColor: Colors.background }}>
+                {renderHeader()}
+                <View style={styles.centered}>
+                    <ActivityIndicator size="large" color={Colors.primary} />
+                    <Text style={{ marginTop: 10, color: Colors.textSecondary }}>
+                        {isSearchingReturn ? "Đang tìm chuyến về..." : "Đang tìm chuyến đi..."}
+                    </Text>
+                </View>
             </View>
         );
     }
 
     return (
         <View style={styles.container}>
-            <Stack.Screen
-                options={{
-                    title: isSearchingReturn ? "Chọn Chiều Về" : "Chọn Chiều Đi",
-                    headerTintColor: Colors.text,
-                    headerShadowVisible: false,
-                    headerStyle: { backgroundColor: Colors.background },
-                    headerBackTitle: "Tìm lại"
-                }}
-            />
-
-            {/* Info Sub-header */}
-            <View style={styles.subHeader}>
-                <View style={styles.routeContainer}>
-                    <Ionicons name={isSearchingReturn ? "airplane-outline" : "airplane"} size={20} color={Colors.primary} style={{ transform: [{ scaleX: isSearchingReturn ? -1 : 1 }] }} />
-                    <Text style={styles.subHeaderText}>
-                        {currentRouteText}
-                    </Text>
-                </View>
-                <Text style={styles.dateText}>{currentSearchDateString}</Text>
-            </View>
+            {renderHeader()}
 
             {/* Selected Outbound Summary (Only when picking return) */}
             {isSearchingReturn && selectedOutboundFlight && (
@@ -168,7 +178,7 @@ const FlightResultsScreen = () => {
                 data={flights}
                 keyExtractor={(item) => item.id}
                 renderItem={({ item }) => <FlightCard flight={item} onBookPress={handleBookPress} />}
-                contentContainerStyle={{ padding: 16, paddingBottom: 40 }}
+                contentContainerStyle={{ padding: 16, paddingBottom: insets.bottom + 20 }}
                 ListEmptyComponent={() => (
                     !loading && !error ? (
                         <View style={styles.centered}>
@@ -187,10 +197,14 @@ export default FlightResultsScreen;
 const styles = StyleSheet.create({
     container: { flex: 1, backgroundColor: Colors.background },
     centered: { flex: 1, justifyContent: 'center', alignItems: 'center', marginTop: 50, padding: 20 },
-    subHeader: { paddingHorizontal: 20, paddingBottom: 15, backgroundColor: Colors.background, borderBottomWidth: 1, borderBottomColor: '#eee' },
-    routeContainer: { flexDirection: 'row', alignItems: 'center', marginBottom: 4 },
-    subHeaderText: { fontSize: 18, fontWeight: 'bold', color: Colors.text, marginLeft: 8 },
-    dateText: { fontSize: 14, color: Colors.textSecondary, marginLeft: 28 },
+
+    // Custom Header Styles
+    headerContent: { paddingHorizontal: 20 },
+    row: { flexDirection: 'row', alignItems: 'center' },
+    headerTitle: { fontSize: 20, fontWeight: 'bold', color: 'white' },
+    routeContainer: { flexDirection: 'row', alignItems: 'center', marginTop: 4 },
+    headerSubtitle: { fontSize: 13, color: 'rgba(255,255,255,0.9)' },
+
 
     summaryBar: { padding: 12, backgroundColor: '#E8F5E9', borderBottomWidth: 1, borderBottomColor: '#C8E6C9', flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 20 },
     summaryRow: { flexDirection: 'row', alignItems: 'center' },

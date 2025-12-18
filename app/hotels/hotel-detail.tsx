@@ -26,13 +26,15 @@ const getAmenityIcon = (amenity: string): keyof typeof Ionicons.glyphMap => {
     return 'checkmark-circle-outline';
 };
 
-import { doc, getDoc } from 'firebase/firestore';
+import { doc, getDoc, collection, query, where, getDocs } from 'firebase/firestore';
 import { db } from '@/services/firebaseConfig';
 
 // ... imports
 
 const HotelDetailScreen = () => {
-    const { id } = useLocalSearchParams<{ id: string }>();
+    const params = useLocalSearchParams();
+    const id = (params.id || params.hotelId) as string;
+
     const [hotel, setHotel] = useState<Hotel | null>(null);
     const [loadingData, setLoadingData] = useState(true);
 
@@ -42,27 +44,47 @@ const HotelDetailScreen = () => {
     const [activeImage, setActiveImage] = useState(0);
 
     useEffect(() => {
-        const fetchHotel = async () => {
-            if (!id) return;
+        const fetchHotelAndRooms = async () => {
+            if (!id) {
+                setLoadingData(false);
+                return; // or handle error
+            }
             try {
                 setLoadingData(true);
+
+                // 1. Fetch Hotel Details
                 const docRef = doc(db, "HOTELS", id);
                 const docSnap = await getDoc(docRef);
 
                 if (docSnap.exists()) {
-                    setHotel({ id: docSnap.id, ...docSnap.data() } as Hotel);
+                    const hotelData = { id: docSnap.id, ...docSnap.data() } as Hotel;
+
+                    // 2. Fetch Rooms for this Hotel
+                    // Optimization: We could use a compound query if we had one, but simple query is fine
+                    const roomsRef = collection(db, "ROOMS");
+                    const q = query(roomsRef, where("hotelId", "==", id));
+                    const querySnapshot = await getDocs(q);
+
+                    const rooms: Room[] = [];
+                    querySnapshot.forEach((doc) => {
+                        rooms.push({ id: doc.id, ...doc.data() } as Room);
+                    });
+
+                    // 3. Combine
+                    setHotel({ ...hotelData, rooms });
                 } else {
                     Alert.alert("Lỗi", "Khách sạn không tồn tại.");
                     router.back();
                 }
             } catch (error) {
-                console.error("Error fetching hotel:", error);
+                console.error("Error fetching hotel details:", error);
                 Alert.alert("Lỗi", "Không thể tải thông tin khách sạn.");
             } finally {
                 setLoadingData(false);
             }
         };
-        fetchHotel();
+
+        fetchHotelAndRooms();
     }, [id]);
 
 

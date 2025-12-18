@@ -1,20 +1,21 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { StyleSheet, View, Text, FlatList, ActivityIndicator, Image, TouchableOpacity } from 'react-native';
+import { StyleSheet, View, Text, FlatList, ActivityIndicator, Image, TouchableOpacity, StatusBar } from 'react-native';
 import { useLocalSearchParams, Stack, router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useHotels, Hotel } from '@/hooks/useHotels';
 import { differenceInCalendarDays, format } from 'date-fns';
-import { vi } from 'date-fns/locale';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 const Colors = {
-    primary: '#5B37B7', text: '#333', textSecondary: '#666', background: '#F5F5F5',
-    white: '#FFFFFF', border: '#E0E0E0', price: '#FF5722', success: '#4CAF50',
+    primary: '#0194F3', text: '#333', textSecondary: '#666', background: '#F5F5F5',
+    white: '#FFFFFF', border: '#E0E0E0', price: '#FF5E1F', success: '#28a745',
     star: '#FFC107', warning: '#FF9800'
 };
 
 const HOTEL_PLACEHOLDER = 'https://via.placeholder.com/400x300.png?text=No+Image';
 
 const HotelResultsScreen = () => {
+    const insets = useSafeAreaInsets();
     const params = useLocalSearchParams<{
         city: string; checkInDate: string; checkOutDate: string; guestCount: string;
     }>();
@@ -39,8 +40,7 @@ const HotelResultsScreen = () => {
         router.push({
             pathname: '/hotels/hotel-detail',
             params: {
-                hotelId: hotel.id, // Pass ID mostly, but passing object is ok for simple apps. Better to re-fetch or find in next screen if needed. 
-                // Passing stringified object for simplicity as per plan
+                id: hotel.id, // Changed from hotelId to match hotel-detail expectation
                 hotel: JSON.stringify(hotel),
                 checkInDate: params.checkInDate,
                 checkOutDate: params.checkOutDate,
@@ -110,41 +110,47 @@ const HotelResultsScreen = () => {
         );
     };
 
+    // Custom Header
+    const renderHeader = () => (
+        <View style={{ paddingTop: insets.top, backgroundColor: Colors.primary, paddingBottom: 15, borderBottomLeftRadius: 20, borderBottomRightRadius: 20 }}>
+            <StatusBar barStyle="light-content" backgroundColor={Colors.primary} />
+            <Stack.Screen options={{ headerShown: false }} />
+
+            <View style={{ paddingHorizontal: 20 }}>
+                <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                    <Ionicons name="arrow-back" size={24} color="white" onPress={() => router.back()} style={{ marginRight: 15 }} />
+                    <View>
+                        <Text style={styles.headerTitle}>{params.city ? `${params.city}` : 'Kết quả tìm kiếm'}</Text>
+                        <Text style={styles.headerSubtitle}>
+                            {format(checkIn, 'dd/MM')} - {format(checkOut, 'dd/MM')} • {params.guestCount} khách
+                        </Text>
+                    </View>
+                </View>
+            </View>
+        </View>
+    );
+
     if (loading) {
         return (
-            <View style={styles.centered}>
-                <ActivityIndicator size="large" color={Colors.primary} />
-                <Text style={{ marginTop: 10, color: Colors.textSecondary }}>Đang tìm khách sạn tốt nhất...</Text>
+            <View style={{ flex: 1, backgroundColor: Colors.background }}>
+                {renderHeader()}
+                <View style={styles.centered}>
+                    <ActivityIndicator size="large" color={Colors.primary} />
+                    <Text style={{ marginTop: 10, color: Colors.textSecondary }}>Đang tìm khách sạn tốt nhất...</Text>
+                </View>
             </View>
         );
     }
 
     return (
         <View style={styles.container}>
-            <Stack.Screen options={{
-                title: params.city ? `Hơn ${hotels.length} chỗ nghỉ tại ${params.city}` : 'Kết quả tìm kiếm',
-                headerTintColor: Colors.text,
-                headerShadowVisible: false,
-                headerStyle: { backgroundColor: Colors.background }
-            }} />
-
-            {/* Filter Summary */}
-            <View style={styles.filtersBar}>
-                <View style={styles.filterItem}>
-                    <Ionicons name="calendar-outline" size={16} color={Colors.primary} />
-                    <Text style={styles.filterText}>{format(checkIn, 'dd/MM')} - {format(checkOut, 'dd/MM')}</Text>
-                </View>
-                <View style={styles.filterItem}>
-                    <Ionicons name="people-outline" size={16} color={Colors.primary} />
-                    <Text style={styles.filterText}>{params.guestCount} khách</Text>
-                </View>
-            </View>
+            {renderHeader()}
 
             <FlatList
                 data={hotels}
                 keyExtractor={item => item.id}
                 renderItem={renderHotelItem}
-                contentContainerStyle={{ padding: 15 }}
+                contentContainerStyle={{ padding: 15, paddingBottom: insets.bottom + 20 }}
                 ListEmptyComponent={
                     <View style={styles.centered}>
                         <Text>Không tìm thấy khách sạn nào khớp với "{params.city}"</Text>
@@ -160,6 +166,11 @@ export default HotelResultsScreen;
 const styles = StyleSheet.create({
     container: { flex: 1, backgroundColor: Colors.background },
     centered: { flex: 1, justifyContent: 'center', alignItems: 'center', marginTop: 50 },
+
+    // Header Styles
+    headerTitle: { fontSize: 20, fontWeight: 'bold', color: 'white' },
+    headerSubtitle: { fontSize: 13, color: 'rgba(255,255,255,0.9)', marginTop: 4 },
+
     filtersBar: { flexDirection: 'row', paddingHorizontal: 15, paddingVertical: 10, backgroundColor: Colors.white, borderBottomWidth: 1, borderBottomColor: '#eee' },
     filterItem: { flexDirection: 'row', alignItems: 'center', marginRight: 15, backgroundColor: '#f0f0f0', paddingHorizontal: 10, paddingVertical: 6, borderRadius: 20 },
     filterText: { marginLeft: 5, fontSize: 13, fontWeight: '600', color: Colors.text },

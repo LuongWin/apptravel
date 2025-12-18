@@ -6,14 +6,16 @@ import { useBookings } from '@/hooks/useBookings';
 import { doc, getDoc } from 'firebase/firestore';
 import { db, auth } from '@/services/firebaseConfig';
 import { ActivityIndicator } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 const Colors = {
-    primary: '#5B37B7', text: '#333', textSecondary: '#666', background: '#F5F5F5',
+    primary: '#0194F3', text: '#333', textSecondary: '#666', background: '#F5F5F5',
     white: '#FFFFFF', border: '#DDDDDD', price: '#d32f2f',
     inputBg: '#FAFAFA' // Slightly off-white for inputs
 };
 
 const FlightDetailScreen = () => {
+    const insets = useSafeAreaInsets();
     const { id, booking } = useLocalSearchParams<{ id: string; booking: string }>();
     const [bookingDetails, setBookingDetails] = useState<any>(null);
     const [loadingData, setLoadingData] = useState(true);
@@ -137,134 +139,145 @@ const FlightDetailScreen = () => {
     if (!bookingDetails) return null;
 
     return (
-        <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={{ flex: 1 }}>
-            <Stack.Screen options={{ title: 'Thông tin đặt chỗ', headerBackTitle: 'Quay lại' }} />
+        <View style={{ flex: 1, paddingTop: insets.top, backgroundColor: Colors.background }}>
+            <Stack.Screen options={{ headerShown: false }} />
 
-            <ScrollView style={styles.container} contentContainerStyle={{ paddingBottom: 100 }}>
+            {/* Header */}
+            <View style={styles.header}>
+                <TouchableOpacity onPress={() => router.back()} style={{ padding: 10 }}>
+                    <Ionicons name="arrow-back" size={24} color={Colors.text} />
+                </TouchableOpacity>
+                <Text style={styles.headerTitle}>Thông tin đặt chỗ</Text>
+                <View style={{ width: 44 }} />
+            </View>
 
-                {/* Flight Summary Header */}
-                <View style={styles.card}>
-                    <Text style={styles.cardHeader}>Chuyến bay đã chọn</Text>
-                    <View style={styles.flightSummary}>
-                        <Ionicons name="airplane" size={16} color={Colors.primary} />
-                        <Text style={styles.flightRoute}>
-                            {bookingDetails.outboundFlight.from} <Ionicons name="arrow-forward" /> {bookingDetails.outboundFlight.to}
-                        </Text>
-                    </View>
-                    {bookingDetails.returnFlight && (
-                        <View style={[styles.flightSummary, { marginTop: 8 }]}>
-                            <Ionicons name="airplane" size={16} color={Colors.primary} style={{ transform: [{ scaleX: -1 }] }} />
+            <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={{ flex: 1 }}>
+                <ScrollView style={styles.container} contentContainerStyle={{ paddingBottom: 100 }}>
+
+                    {/* Flight Summary Header */}
+                    <View style={styles.card}>
+                        <Text style={styles.cardHeader}>Chuyến bay đã chọn</Text>
+                        <View style={styles.flightSummary}>
+                            <Ionicons name="airplane" size={16} color={Colors.primary} />
                             <Text style={styles.flightRoute}>
-                                {bookingDetails.returnFlight.from} <Ionicons name="arrow-forward" /> {bookingDetails.returnFlight.to}
+                                {bookingDetails.outboundFlight.from} <Ionicons name="arrow-forward" /> {bookingDetails.outboundFlight.to}
                             </Text>
                         </View>
-                    )}
+                        {bookingDetails.returnFlight && (
+                            <View style={[styles.flightSummary, { marginTop: 8 }]}>
+                                <Ionicons name="airplane" size={16} color={Colors.primary} style={{ transform: [{ scaleX: -1 }] }} />
+                                <Text style={styles.flightRoute}>
+                                    {bookingDetails.returnFlight.from} <Ionicons name="arrow-forward" /> {bookingDetails.returnFlight.to}
+                                </Text>
+                            </View>
+                        )}
+                    </View>
+
+                    {/* Contact Info Section */}
+                    <View style={styles.card}>
+                        <Text style={styles.cardTitle}>Chi tiết liên lạc</Text>
+                        <Text style={styles.cardSubtitle}>Xác nhận của quý khách sẽ được gửi đến đây</Text>
+                        <Text style={styles.requiredLabel}>*Mục bắt buộc</Text>
+
+                        <View style={styles.inputGroup}>
+                            <Text style={styles.label}>Tên *</Text>
+                            <TextInput
+                                style={styles.input}
+                                value={contactInfo.firstName}
+                                onChangeText={(t) => setContactInfo({ ...contactInfo, firstName: t })}
+                                placeholder="Thắng"
+                            />
+                        </View>
+                        <View style={styles.inputGroup}>
+                            <Text style={styles.label}>Họ (vd: Nguyễn) *</Text>
+                            <TextInput
+                                style={styles.input}
+                                value={contactInfo.lastName}
+                                onChangeText={(t) => setContactInfo({ ...contactInfo, lastName: t })}
+                                placeholder="Lương"
+                            />
+                        </View>
+                        <View style={styles.inputGroup}>
+                            <Text style={styles.label}>Email ID *</Text>
+                            <TextInput
+                                style={styles.input}
+                                value={contactInfo.email}
+                                onChangeText={(t) => setContactInfo({ ...contactInfo, email: t })}
+                                keyboardType="email-address"
+                                autoCapitalize="none"
+                            />
+                        </View>
+                        <View style={styles.inputGroup}>
+                            <Text style={styles.label}>Số điện thoại *</Text>
+                            <TextInput
+                                style={styles.input}
+                                value={contactInfo.phoneNumber}
+                                onChangeText={(t) => setContactInfo({ ...contactInfo, phoneNumber: t })}
+                                keyboardType="phone-pad"
+                            />
+                        </View>
+                    </View>
+
+                    {/* Passenger Info Section */}
+                    <View style={styles.card}>
+                        <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 10 }}>
+                            <Ionicons name="person" size={20} color={Colors.textSecondary} />
+                            <Text style={[styles.cardTitle, { marginBottom: 0, marginLeft: 8 }]}>Hành khách 1: (Người lớn)</Text>
+                        </View>
+
+                        <Text style={styles.cardSubtitle}>Thông tin hành khách phải trùng khớp với hộ chiếu/CCCD</Text>
+                        <Text style={styles.requiredLabel}>*Mục bắt buộc</Text>
+
+                        {/* Gender Radio */}
+                        <View style={{ flexDirection: 'row', marginVertical: 10 }}>
+                            {['Nam', 'Nữ'].map((g) => (
+                                <TouchableOpacity key={g} style={{ flexDirection: 'row', alignItems: 'center', marginRight: 20 }} onPress={() => setPassenger({ ...passenger, gender: g })}>
+                                    <Ionicons name={passenger.gender === g ? "radio-button-on" : "radio-button-off"} size={24} color={Colors.text} />
+                                    <Text style={{ marginLeft: 8, fontSize: 16 }}>{g}</Text>
+                                </TouchableOpacity>
+                            ))}
+                        </View>
+
+                        <View style={styles.inputGroup}>
+                            <Text style={styles.label}>Tên đệm và Tên *</Text>
+                            <TextInput
+                                style={styles.input}
+                                value={passenger.firstName}
+                                onChangeText={(t) => setPassenger({ ...passenger, firstName: t })}
+                            />
+                        </View>
+                        <View style={styles.inputGroup}>
+                            <Text style={styles.label}>Họ *</Text>
+                            <TextInput
+                                style={styles.input}
+                                value={passenger.lastName}
+                                onChangeText={(t) => setPassenger({ ...passenger, lastName: t })}
+                            />
+                        </View>
+
+                        <Text style={styles.label}>Ngày sinh *</Text>
+                        <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
+                            <TextInput style={[styles.input, { flex: 0.3 }]} placeholder="Ngày" keyboardType="numeric" onChangeText={(t) => setPassenger({ ...passenger, day: t })} />
+                            <TextInput style={[styles.input, { flex: 0.3 }]} placeholder="Tháng" keyboardType="numeric" onChangeText={(t) => setPassenger({ ...passenger, month: t })} />
+                            <TextInput style={[styles.input, { flex: 0.3 }]} placeholder="Năm" keyboardType="numeric" onChangeText={(t) => setPassenger({ ...passenger, year: t })} />
+                        </View>
+
+                    </View>
+                </ScrollView>
+
+                {/* Bottom Bar */}
+                <View style={styles.bottomBar}>
+                    <View>
+                        <Text style={styles.totalLabel}>Tổng cộng</Text>
+                        <Text style={styles.totalPrice}>{calculateTotal().toLocaleString('vi-VN')} ₫</Text>
+                        <Text style={styles.taxLabel}>Bao gồm thuế</Text>
+                    </View>
+                    <TouchableOpacity style={[styles.continueButton, loading && { opacity: 0.7 }]} onPress={handleContinue} disabled={loading}>
+                        <Text style={styles.continueText}>{loading ? "Đang xử lý..." : "Tiếp tục"}</Text>
+                    </TouchableOpacity>
                 </View>
-
-                {/* Contact Info Section */}
-                <View style={styles.card}>
-                    <Text style={styles.cardTitle}>Chi tiết liên lạc</Text>
-                    <Text style={styles.cardSubtitle}>Xác nhận của quý khách sẽ được gửi đến đây</Text>
-                    <Text style={styles.requiredLabel}>*Mục bắt buộc</Text>
-
-                    <View style={styles.inputGroup}>
-                        <Text style={styles.label}>Tên *</Text>
-                        <TextInput
-                            style={styles.input}
-                            value={contactInfo.firstName}
-                            onChangeText={(t) => setContactInfo({ ...contactInfo, firstName: t })}
-                            placeholder="Thắng"
-                        />
-                    </View>
-                    <View style={styles.inputGroup}>
-                        <Text style={styles.label}>Họ (vd: Nguyễn) *</Text>
-                        <TextInput
-                            style={styles.input}
-                            value={contactInfo.lastName}
-                            onChangeText={(t) => setContactInfo({ ...contactInfo, lastName: t })}
-                            placeholder="Lương"
-                        />
-                    </View>
-                    <View style={styles.inputGroup}>
-                        <Text style={styles.label}>Email ID *</Text>
-                        <TextInput
-                            style={styles.input}
-                            value={contactInfo.email}
-                            onChangeText={(t) => setContactInfo({ ...contactInfo, email: t })}
-                            keyboardType="email-address"
-                            autoCapitalize="none"
-                        />
-                    </View>
-                    <View style={styles.inputGroup}>
-                        <Text style={styles.label}>Số điện thoại *</Text>
-                        <TextInput
-                            style={styles.input}
-                            value={contactInfo.phoneNumber}
-                            onChangeText={(t) => setContactInfo({ ...contactInfo, phoneNumber: t })}
-                            keyboardType="phone-pad"
-                        />
-                    </View>
-                </View>
-
-                {/* Passenger Info Section */}
-                <View style={styles.card}>
-                    <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 10 }}>
-                        <Ionicons name="person" size={20} color={Colors.textSecondary} />
-                        <Text style={[styles.cardTitle, { marginBottom: 0, marginLeft: 8 }]}>Hành khách 1: (Người lớn)</Text>
-                    </View>
-
-                    <Text style={styles.cardSubtitle}>Thông tin hành khách phải trùng khớp với hộ chiếu/CCCD</Text>
-                    <Text style={styles.requiredLabel}>*Mục bắt buộc</Text>
-
-                    {/* Gender Radio */}
-                    <View style={{ flexDirection: 'row', marginVertical: 10 }}>
-                        {['Nam', 'Nữ'].map((g) => (
-                            <TouchableOpacity key={g} style={{ flexDirection: 'row', alignItems: 'center', marginRight: 20 }} onPress={() => setPassenger({ ...passenger, gender: g })}>
-                                <Ionicons name={passenger.gender === g ? "radio-button-on" : "radio-button-off"} size={24} color={Colors.text} />
-                                <Text style={{ marginLeft: 8, fontSize: 16 }}>{g}</Text>
-                            </TouchableOpacity>
-                        ))}
-                    </View>
-
-                    <View style={styles.inputGroup}>
-                        <Text style={styles.label}>Tên đệm và Tên *</Text>
-                        <TextInput
-                            style={styles.input}
-                            value={passenger.firstName}
-                            onChangeText={(t) => setPassenger({ ...passenger, firstName: t })}
-                        />
-                    </View>
-                    <View style={styles.inputGroup}>
-                        <Text style={styles.label}>Họ *</Text>
-                        <TextInput
-                            style={styles.input}
-                            value={passenger.lastName}
-                            onChangeText={(t) => setPassenger({ ...passenger, lastName: t })}
-                        />
-                    </View>
-
-                    <Text style={styles.label}>Ngày sinh *</Text>
-                    <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
-                        <TextInput style={[styles.input, { flex: 0.3 }]} placeholder="Ngày" keyboardType="numeric" onChangeText={(t) => setPassenger({ ...passenger, day: t })} />
-                        <TextInput style={[styles.input, { flex: 0.3 }]} placeholder="Tháng" keyboardType="numeric" onChangeText={(t) => setPassenger({ ...passenger, month: t })} />
-                        <TextInput style={[styles.input, { flex: 0.3 }]} placeholder="Năm" keyboardType="numeric" onChangeText={(t) => setPassenger({ ...passenger, year: t })} />
-                    </View>
-
-                </View>
-            </ScrollView>
-
-            {/* Bottom Bar */}
-            <View style={styles.bottomBar}>
-                <View>
-                    <Text style={styles.totalLabel}>Tổng cộng</Text>
-                    <Text style={styles.totalPrice}>{calculateTotal().toLocaleString('vi-VN')} ₫</Text>
-                    <Text style={styles.taxLabel}>Bao gồm thuế</Text>
-                </View>
-                <TouchableOpacity style={[styles.continueButton, loading && { opacity: 0.7 }]} onPress={handleContinue} disabled={loading}>
-                    <Text style={styles.continueText}>{loading ? "Đang xử lý..." : "Tiếp tục"}</Text>
-                </TouchableOpacity>
-            </View>
-        </KeyboardAvoidingView>
+            </KeyboardAvoidingView>
+        </View>
     );
 };
 
@@ -272,6 +285,11 @@ export default FlightDetailScreen;
 
 const styles = StyleSheet.create({
     container: { flex: 1, backgroundColor: Colors.background, padding: 10 },
+
+    // Header
+    header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 10, paddingBottom: 10, borderBottomWidth: 1, borderBottomColor: '#eee', backgroundColor: 'white' },
+    headerTitle: { fontSize: 18, fontWeight: 'bold', color: Colors.text },
+
     card: { backgroundColor: Colors.white, borderRadius: 12, padding: 15, marginBottom: 15, shadowColor: '#000', shadowOpacity: 0.05, shadowRadius: 5, elevation: 2 },
     cardHeader: { fontSize: 14, color: Colors.textSecondary, marginBottom: 8 },
     cardTitle: { fontSize: 18, fontWeight: 'bold', color: Colors.text, marginBottom: 4 },

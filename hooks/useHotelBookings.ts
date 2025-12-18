@@ -18,6 +18,7 @@ export interface HotelBookingData {
         phoneNumber: string;
     };
     guestCount: number;
+    roomQuantity?: number;
 }
 
 export const useHotelBookings = () => {

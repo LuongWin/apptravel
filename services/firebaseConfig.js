@@ -1,10 +1,11 @@
 // services/firebaseConfig.js
 
+import ReactNativeAsyncStorage from '@react-native-async-storage/async-storage';
 import { initializeApp } from 'firebase/app';
-import { getAuth } from 'firebase/auth'; // N?u b?n dùng Authentication
-import { getFirestore } from 'firebase/firestore'; // N?u b?n dùng Firestore
+import { getReactNativePersistence, initializeAuth } from 'firebase/auth';
+import { getFirestore } from 'firebase/firestore'; // N?u b?n dï¿½ng Firestore
 
-// 1. Dán c?u h?nh t? Firebase Console vào ðây
+// 1. Dï¿½n c?u h?nh t? Firebase Console vï¿½o ï¿½ï¿½y
 const firebaseConfig = {
   apiKey: "AIzaSyBSYqFoHi7_tcbbuJbJ-98Tv0HCYLXNxAo",
   authDomain: "appdulich-e282e.firebaseapp.com",
@@ -19,9 +20,24 @@ const firebaseConfig = {
 // 2. Kh?i t?o Firebase
 const app = initializeApp(firebaseConfig);
 
-// 3. Kh?i t?o các d?ch v? b?n c?n (ví d?: Auth và Firestore)
-export const auth = getAuth(app);
+// 3. Kh?i t?o cï¿½c d?ch v? b?n c?n (vï¿½ d?: Auth vï¿½ Firestore)
+let auth;
+try {
+  auth = initializeAuth(app, {
+    persistence: getReactNativePersistence(ReactNativeAsyncStorage)
+  });
+} catch (error) {
+  // N?u auth ï¿½ï¿½ ï¿½ï¿½?c kh?i t?o r?i (vï¿½ d?: do hot reload)
+  if (error.code === 'auth/already-initialized') {
+    const { getAuth } = require('firebase/auth');
+    auth = getAuth(app);
+  } else {
+    throw error;
+  }
+}
+
+export { auth };
 export const db = getFirestore(app);
 
-// Xu?t các ð?i tý?ng ð? ðý?c kh?i t?o ð? s? d?ng trong toàn b? ?ng d?ng
+// Xu?t cï¿½c ï¿½?i tï¿½?ng ï¿½? ï¿½ï¿½?c kh?i t?o ï¿½? s? d?ng trong toï¿½n b? ?ng d?ng
 // export default app;

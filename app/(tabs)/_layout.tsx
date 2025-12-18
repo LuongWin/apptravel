@@ -24,6 +24,27 @@ export default function TabLayout() {
         }}
       />
       <Tabs.Screen
+        name="flights"
+        options={{
+          title: 'Chuyến bay',
+          tabBarIcon: ({ color }) => <IconSymbol size={28} name="airplane" color={color} />,
+        }}
+      />
+      <Tabs.Screen
+        name="hotels"
+        options={{
+          title: 'Khách sạn',
+          tabBarIcon: ({ color }) => <IconSymbol size={28} name="building.2.fill" color={color} />,
+        }}
+      />
+      <Tabs.Screen
+        name="tours"
+        options={{
+          title: 'Tours',
+          tabBarIcon: ({ color }) => <IconSymbol size={28} name="globe.asia.australia.fill" color={color} />,
+        }}
+      />
+      <Tabs.Screen
         name="explore"
         options={{
           title: 'Explore',

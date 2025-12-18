@@ -1,7 +1,7 @@
 // hooks/useBookings.ts
+import { auth, db } from '@/services/firebaseConfig';
+import { addDoc, collection, Timestamp } from 'firebase/firestore';
 import { useState } from 'react';
-import { db, auth } from '@/services/firebaseConfig';
-import { collection, addDoc, Timestamp } from 'firebase/firestore';
 
 export interface BookingData {
     outboundFlightSnapshot: any;
@@ -59,4 +59,67 @@ export const useBookings = () => {
     };
 
     return { createBooking, loading, error };
+};
+
+export interface TourBookingData {
+    tourId: string;
+    tourName: string;
+    selectedDate: string;
+    adultCount: number;
+    childCount: number;
+    infantCount: number;
+    totalAmount: number;
+    contactInfo?: {
+        firstName?: string;
+        lastName?: string;
+        email?: string;
+        phoneNumber?: string;
+    };
+}
+
+export const useTourBookings = () => {
+    const [loading, setLoading] = useState(false);
+    const [error, setError] = useState<string | null>(null);
+
+    const createTourBooking = async (data: TourBookingData) => {
+        setLoading(true);
+        setError(null);
+
+        try {
+            const user = auth.currentUser;
+
+            const bookingPayload = {
+                userId: user?.uid || 'guest',
+                userEmail: user?.email || '',
+                tourId: data.tourId,
+                tourName: data.tourName,
+                bookingDate: Timestamp.now(),
+                departureDate: data.selectedDate,
+                guests: {
+                    adults: data.adultCount,
+                    children: data.childCount,
+                    infants: data.infantCount,
+                    total: data.adultCount + data.childCount + data.infantCount
+                },
+                totalAmount: data.totalAmount,
+                contactInfo: data.contactInfo || {},
+                status: 'PENDING',
+                createdAt: Timestamp.now(),
+                updatedAt: Timestamp.now()
+            };
+
+            const docRef = await addDoc(collection(db, 'TOUR_BOOKINGS'), bookingPayload);
+            console.log("Tour booking created with ID: ", docRef.id);
+            return docRef.id;
+
+        } catch (err: any) {
+            console.error("Error creating tour booking:", err);
+            setError(err.message || "Không thể tạo đơn đặt tour. Vui lòng thử lại.");
+            throw err;
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    return { createTourBooking, loading, error };
 };

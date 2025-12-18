@@ -1,5 +1,5 @@
 import React, { useState, useMemo } from 'react';
-import { StyleSheet, View, Text, ScrollView, TextInput, TouchableOpacity, Alert, ActivityIndicator, Image } from 'react-native';
+import { StyleSheet, View, Text, ScrollView, TextInput, TouchableOpacity, Alert, ActivityIndicator, Image, Modal } from 'react-native';
 import { useLocalSearchParams, Stack, router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useHotelBookings } from '@/hooks/useHotelBookings';
@@ -24,6 +24,9 @@ const HotelBookingDetailScreen = () => {
     const [lastName, setLastName] = useState('');
     const [email, setEmail] = useState('');
     const [phone, setPhone] = useState('');
+
+    // Success Modal State
+    const [successModalVisible, setSuccessModalVisible] = useState(false);
 
     // 1. State for Room Quantity
     const [roomQuantity, setRoomQuantity] = useState(1);
@@ -93,9 +96,9 @@ const HotelBookingDetailScreen = () => {
                 roomQuantity: roomQuantity, // 4. Include room quantity
             });
 
-            Alert.alert("Thành công", "Đặt phòng thành công!", [
-                { text: "Về trang chủ", onPress: () => router.dismissAll() }
-            ]);
+            // Show success modal instead of Alert
+            setSuccessModalVisible(true);
+
         } catch (error: any) {
             Alert.alert("Lỗi", error.message || "Có lỗi xảy ra.");
         }
@@ -244,6 +247,49 @@ const HotelBookingDetailScreen = () => {
 
                 <View style={{ height: 40 }} />
             </ScrollView>
+
+            {/* Success Modal */}
+            <Modal
+                visible={successModalVisible}
+                animationType="fade"
+                transparent={true}
+                onRequestClose={() => setSuccessModalVisible(false)}
+            >
+                <View style={styles.successOverlay}>
+                    <View style={styles.successCard}>
+                        <View style={styles.successIconContainer}>
+                            <Ionicons name="checkmark-circle" size={60} color="#4CAF50" />
+                        </View>
+                        <Text style={styles.successTitle}>Đặt phòng thành công!</Text>
+                        <Text style={styles.successMessage}>
+                            Yêu cầu đặt phòng của bạn đã được ghi nhận. Chúng tôi sẽ liên hệ với bạn trong thời gian sớm nhất.
+                        </Text>
+                        <View style={styles.successButtonGroup}>
+                            <TouchableOpacity
+                                style={styles.successButtonSecondary}
+                                onPress={() => {
+                                    setSuccessModalVisible(false);
+                                    router.dismissAll();
+                                    router.replace("/(tabs)/hotels");
+                                }}
+                            >
+                                <Text style={styles.successButtonSecondaryText}>Quay lại</Text>
+                            </TouchableOpacity>
+                            <TouchableOpacity
+                                style={styles.successButtonPrimary}
+                                onPress={() => {
+                                    setSuccessModalVisible(false);
+                                    router.dismissAll();
+                                    router.replace("/(tabs)/profile");
+                                }}
+                            >
+                                <Text style={styles.successButtonPrimaryText}>Tiếp tục xem</Text>
+                            </TouchableOpacity>
+                        </View>
+                    </View>
+                </View>
+            </Modal>
+
         </View>
     );
 };
@@ -294,5 +340,17 @@ const styles = StyleSheet.create({
 
     submitButton: { backgroundColor: Colors.primary, paddingVertical: 12, borderRadius: 12, alignItems: 'center', shadowColor: Colors.primary, shadowOpacity: 0.3, shadowRadius: 5, elevation: 4 },
     submitButtonText: { color: 'white', fontSize: 16, fontWeight: 'bold' },
-    submitButtonSubText: { color: 'rgba(255,255,255,0.9)', fontSize: 14, marginTop: 2, fontWeight: '600' }
+    submitButtonSubText: { color: 'rgba(255,255,255,0.9)', fontSize: 14, marginTop: 2, fontWeight: '600' },
+
+    // Success Modal Styles
+    successOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.6)', justifyContent: 'center', alignItems: 'center', padding: 20 },
+    successCard: { backgroundColor: 'white', borderRadius: 24, padding: 25, alignItems: 'center', width: '100%', maxWidth: 350, shadowColor: "#000", shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.2, shadowRadius: 10, elevation: 10 },
+    successIconContainer: { width: 80, height: 80, borderRadius: 40, backgroundColor: '#E8F5E9', justifyContent: 'center', alignItems: 'center', marginBottom: 20 },
+    successTitle: { fontSize: 22, fontWeight: 'bold', color: '#1A1A1A', marginBottom: 12, textAlign: 'center' },
+    successMessage: { fontSize: 15, color: '#666', textAlign: 'center', marginBottom: 25, lineHeight: 22 },
+    successButtonGroup: { flexDirection: 'row', gap: 12, width: '100%' },
+    successButtonSecondary: { flex: 1, paddingVertical: 12, borderRadius: 12, backgroundColor: '#F5F5F5', alignItems: 'center' },
+    successButtonSecondaryText: { color: '#666', fontSize: 16, fontWeight: '600' },
+    successButtonPrimary: { flex: 1, paddingVertical: 12, borderRadius: 12, backgroundColor: '#5B7FFF', alignItems: 'center' },
+    successButtonPrimaryText: { color: 'white', fontSize: 16, fontWeight: '600' },
 });

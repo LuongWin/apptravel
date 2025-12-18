@@ -205,17 +205,17 @@ const HotelBookingDetailScreen = () => {
                     <Text style={styles.sectionTitle}>Thông tin khách hàng</Text>
 
                     <View style={styles.inputGroup}>
-                        <Text style={styles.label}>Họ (ví dụ: Nguyen)</Text>
+                        <Text style={styles.label}>Họ *</Text>
                         <TextInput style={styles.input} value={lastName} onChangeText={setLastName} placeholder="Nhập họ" />
                     </View>
 
                     <View style={styles.inputGroup}>
-                        <Text style={styles.label}>Tên đệm & Tên (ví dụ: Van A)</Text>
+                        <Text style={styles.label}>Tên đệm & Tên *</Text>
                         <TextInput style={styles.input} value={firstName} onChangeText={setFirstName} placeholder="Nhập tên" />
                     </View>
 
                     <View style={styles.inputGroup}>
-                        <Text style={styles.label}>Số điện thoại</Text>
+                        <Text style={styles.label}>Số điện thoại *</Text>
                         <TextInput style={styles.input} value={phone} onChangeText={setPhone} keyboardType="phone-pad" placeholder="09xxxxxxx" />
                     </View>
 

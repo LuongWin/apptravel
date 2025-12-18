@@ -40,12 +40,12 @@ export const useBookings = () => {
 
             const bookingPayload = {
                 userId: user.uid,
-                bookingDate: Timestamp.now(),
-                status: 'COMPLETED', // Or 'PENDING' if payment integration exists
+                status: 'success',
+                createdAt: Timestamp.now(),
                 ...data
             };
 
-            const docRef = await addDoc(collection(db, 'bookings'), bookingPayload);
+            const docRef = await addDoc(collection(db, 'FLIGHT_BOOKINGS'), bookingPayload);
             console.log("Booking created with ID: ", docRef.id);
             return docRef.id;
 

@@ -168,6 +168,18 @@ const ProfileScreen = () => {
                     </View>
                 </View>
 
+                {/* Booking History */}
+                <Text style={[styles.sectionTitle, { marginTop: 25 }]}>Quản lý đặt chỗ</Text>
+                <View style={styles.card}>
+                    <TouchableOpacity style={styles.menuRow} onPress={() => router.push('/history')}>
+                        <View style={styles.iconBox}>
+                            <Ionicons name="time-outline" size={20} color={Colors.primary} />
+                        </View>
+                        <Text style={styles.menuText}>Lịch sử đặt chỗ</Text>
+                        <Ionicons name="chevron-forward" size={20} color={Colors.textSecondary} />
+                    </TouchableOpacity>
+                </View>
+
                 {/* Logout Section */}
                 <Text style={[styles.sectionTitle, { marginTop: 25 }]}>Tài khoản</Text>
                 <View style={styles.card}>

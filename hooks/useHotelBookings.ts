@@ -37,12 +37,12 @@ export const useHotelBookings = () => {
 
             const bookingPayload = {
                 userId: user.uid,
-                bookingDate: Timestamp.now(),
-                status: 'COMPLETED',
+                status: 'success',
+                createdAt: Timestamp.now(),
                 ...data
             };
 
-            const docRef = await addDoc(collection(db, 'hotelBookings'), bookingPayload);
+            const docRef = await addDoc(collection(db, 'HOTEL_BOOKINGS'), bookingPayload);
             console.log("Hotel booking created ID:", docRef.id);
             return docRef.id;
 

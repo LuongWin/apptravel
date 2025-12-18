@@ -1,8 +1,6 @@
-// services/firebaseConfig.js
-
 import ReactNativeAsyncStorage from '@react-native-async-storage/async-storage';
-import { initializeApp, getApps, getApp } from 'firebase/app';
-import { getReactNativePersistence, initializeAuth } from 'firebase/auth';
+import { initializeApp, getApps, getApp, FirebaseApp } from 'firebase/app';
+import { getReactNativePersistence, initializeAuth, Auth, getAuth } from 'firebase/auth';
 import { getFirestore } from 'firebase/firestore';
 
 // 1. Dán cấu hình từ Firebase Console vào dây
@@ -17,18 +15,17 @@ const firebaseConfig = {
 };
 
 // 2. Khởi tạo Firebase (Kiểm tra xem đã khởi tạo chưa)
-const app = getApps().length === 0 ? initializeApp(firebaseConfig) : getApp();
+const app: FirebaseApp = getApps().length === 0 ? initializeApp(firebaseConfig) : getApp();
 
 // 3. Khởi tạo các dịch vụ bạn cần
-let auth;
+let auth: Auth;
 try {
   auth = initializeAuth(app, {
     persistence: getReactNativePersistence(ReactNativeAsyncStorage)
   });
-} catch (error) {
+} catch (error: any) {
   // Nếu auth đã được khởi tạo rồi (do hot reload)
   if (error.code === 'auth/already-initialized') {
-    const { getAuth } = require('firebase/auth');
     auth = getAuth(app);
   } else {
     throw error;
@@ -37,5 +34,3 @@ try {
 
 export { auth };
 export const db = getFirestore(app);
-
-// export default app;

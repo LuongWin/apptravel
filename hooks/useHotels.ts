@@ -8,7 +8,7 @@ export interface Room {
     name: string;
     price: number;
     maxGuests: number;
-    image?: string; // Added image support for rooms
+    image?: string; 
 }
 
 export interface Hotel {
@@ -43,8 +43,7 @@ export const useHotels = () => {
                 ...doc.data()
             } as Hotel));
 
-            // 2. Fetch ALL Rooms (Optimization: Fetch all once instead of N queries)
-            // Note: If dataset is huge, this is bad. For this app scope, it's efficient.
+            // 2. Fetch ALL Rooms 
             const roomsRef = collection(db, 'ROOMS');
             const roomsSnapshot = await getDocs(roomsRef);
             const allRooms = roomsSnapshot.docs.map(doc => ({

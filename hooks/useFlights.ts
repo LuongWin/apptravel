@@ -1,19 +1,17 @@
 // hooks/useFlights.ts
 
 import { useState, useCallback } from 'react';
-// GIẢ ĐỊNH: Bạn đã có file này trong services/
 import { db } from '@/services/firebaseConfig';
 import { collection, query, where, getDocs, Timestamp } from 'firebase/firestore';
 
-// GIẢ ĐỊNH: Bạn đã tạo file types/Flight.ts
 export interface Flight {
   id: string;
   airline: string;
   flightNumber: string;
   from: string;
   to: string;
-  departAt: Date; // Đã chuyển đổi từ Timestamp
-  arriveAt: Date; // Đã chuyển đổi từ Timestamp
+  departAt: Date;
+  arriveAt: Date; 
   price: number;
   duration: string;
 }
@@ -66,7 +64,6 @@ export const useFlights = () => {
       const departureCity = isReturnFlight ? params.to : params.from;
       const arrivalCity = isReturnFlight ? params.from : params.to;
 
-      // Xây dựng Query: departAt >= 00:00:00 ngày được chọn VÀ departAt < 00:00:00 ngày hôm sau
       let flightQuery = query(
         collection(db, 'FLIGHTS'),
         where('from', '==', departureCity),
@@ -83,7 +80,6 @@ export const useFlights = () => {
         results.push({
           id: doc.id,
           ...data,
-          // Quan trọng: Chuyển đổi Timestamp Firestore sang Date object của JS để sử dụng trong UI
           departAt: data.departAt.toDate(),
           arriveAt: data.arriveAt.toDate(),
         } as Flight);

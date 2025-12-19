@@ -57,21 +57,7 @@ export default function TabLayout() {
         }}
       />
 
-      {/* Hide other potential routes if necessary, or let them auto-hide if not matched? 
-          Actually, we should explicitly hide 'menu' or others if they are not main tabs.
-          But based on the screenshot, only these are relevant. 
-          Trips/menu were in the previous file but maybe not needed? 
-          User only mentioned flights, tours, hotels, profile. 
-          I will remove 'menu' and 'trips' if not requested, or keep 'trips' if it was there?
-          User didn't ask to remove, but the screenshot only shows 5 items. 
-          Wait, screenshot shows: Home, Profile, tours/index, Search, flights/index.
-          "Search" (Tìm Kiếm) might be 'hotels'? Or another tab?
-          In previous code, there was 'menu', 'trips', 'flights', 'hotels', 'tours', 'profile'.
-          I will keep existing ones but fix the mapping for the requested ones.
-          Actually, I'll stick to the requested structure: Home, Flights, Hotels, Tours, Profile.
-          If 'menu' or 'trips' exist, they might show up if not hidden.
-          I'll just define the ones I know.
-      */}
+
     </Tabs>
   );
 }

@@ -92,10 +92,9 @@ const ProfileScreen = () => {
         );
     }
 
-    // Determine Display Values
     const displayName = userData?.fullName || currentUser?.displayName || "Người dùng";
     const displayEmail = userData?.email || currentUser?.email || "";
-    const displayPhone = userData?.phone || currentUser?.phoneNumber || "Chưa cập nhật"; // 'phone' from firestore based on screenshot
+    const displayPhone = userData?.phone || currentUser?.phoneNumber || "Chưa cập nhật"; 
     const displayAddress = userData?.address || "Chưa cập nhật";
     const joinDateRaw = userData?.createdAt || currentUser?.metadata.creationTime;
 
@@ -110,11 +109,15 @@ const ProfileScreen = () => {
             <View style={styles.header}>
                 <View style={styles.headerContent}>
                     <View style={styles.avatarContainer}>
-                        {/* Placeholder Avatar */}
-                        <Image
-                            source={{ uri: userData?.avatar || 'https://i.pravatar.cc/150?img=12' }}
-                            style={styles.avatar}
-                        />
+                        {/* Kiểm tra nếu có ảnh từ database thì hiện, không thì hiện Icon */}
+                        {userData?.avatar ? (
+                            <Image source={{ uri: userData.avatar }} style={styles.avatar} />
+                        ) : (
+                            <View style={[styles.avatar, styles.avatarPlaceholder]}>
+                                <Ionicons name="person" size={50} color={Colors.textSecondary} />
+                            </View>
+                        )}
+
                         <View style={styles.cameraIcon}>
                             <Ionicons name="camera" size={14} color="white" />
                         </View>
@@ -246,6 +249,11 @@ const styles = StyleSheet.create({
         borderRadius: 50,
         borderWidth: 3,
         borderColor: Colors.white,
+    },
+    avatarPlaceholder: {
+        backgroundColor: '#E0E0E0',
+        justifyContent: 'center',
+        alignItems: 'center',
     },
     cameraIcon: {
         position: 'absolute',
